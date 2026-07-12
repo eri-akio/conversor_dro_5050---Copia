@@ -1,0 +1,38 @@
+# Ambientes virtuais
+.venv/
+venv/
+env/
+
+# Cache e arquivos compilados do Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Ferramentas de teste e qualidade
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# IDE
+.vscode/
+.idea/
+
+# Arquivos temporários do sistema
+Thumbs.db
+.DS_Store
+~$*.xlsx
+
+# Saídas geradas pela aplicação
+logs/*
+!logs/.gitkeep
+
+output/*
+!output/.gitkeep
+
+reports/*
+!reports/.gitkeep
+
+# Dados locais e documentos sensíveis
+*.log
