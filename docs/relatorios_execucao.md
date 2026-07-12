@@ -27,12 +27,19 @@ Ocorrencias
 
 ### Resumo
 
-Apresenta resultado final, mensagem, indicadores do processamento e contagens
-das ocorrências.
+Apresenta resultado final, mensagem, indicadores do processamento, contagens
+das ocorrências e os quatro diagnósticos independentes:
+
+```text
+Status local
+Status XSD
+Status externo
+Status histórico
+```
 
 ### Ocorrencias
 
-Apresenta estas 17 colunas:
+Apresenta estas 19 colunas:
 
 ```text
 Resultado Final
@@ -52,7 +59,12 @@ Status
 Sugestão
 Mensagem
 Dependência
+Escopo
+Resultado Definitivo
 ```
+
+Para regras adiadas, `Status` preserva o valor `ADIADA` e `Resultado
+Definitivo` apresenta a decisão produzida no nível do evento.
 
 ## Execução
 

@@ -31,6 +31,10 @@ from src.normalizers.null_normalizer import is_null_candidate
 
 
 RULE_CODE = "NORM-DECIMAL-001"
+BRL_SYMBOL_RULE_CODE = "REMOCAO_SIMBOLO_BRL"
+ACCOUNTING_PARENTHESES_RULE_CODE = (
+    "CONVERSAO_PARENTESES_CONTABEIS"
+)
 _NUMBER_TEXT_PATTERN = re.compile(
     r"^[+-]?[0-9][0-9.,]*$"
 )
@@ -67,6 +71,7 @@ def normalize_decimal(
 
     parsed_value: Decimal | None
     parse_issue: tuple[str, str] | None = None
+    applied_rule_code = RULE_CODE
 
     if isinstance(value, bool):
         parsed_value = None
@@ -80,6 +85,13 @@ def normalize_decimal(
 
     elif isinstance(value, int):
         parsed_value = Decimal(value)
+        if _significant_digit_count(parsed_value) > 15:
+            parsed_value = None
+            parse_issue = (
+                "DEC-PRECISAO-001",
+                "O número nativo do Excel possui risco de perda "
+                "de precisão.",
+            )
 
     elif isinstance(value, float):
         if not math.isfinite(value):
@@ -90,12 +102,26 @@ def normalize_decimal(
             )
         else:
             parsed_value = Decimal(str(value))
+            if _significant_digit_count(parsed_value) > 15:
+                parsed_value = None
+                parse_issue = (
+                    "DEC-PRECISAO-001",
+                    "O número nativo do Excel possui risco de perda "
+                    "de precisão.",
+                )
 
     elif isinstance(value, str):
-        parsed_value, parse_issue = _parse_decimal_text(
-            value,
-            decimal_places=decimal_places,
+        prepared, applied_rule_code, parse_issue = (
+            _prepare_decimal_text(value)
         )
+        if parse_issue is None:
+            assert prepared is not None
+            parsed_value, parse_issue = _parse_decimal_text(
+                prepared,
+                decimal_places=decimal_places,
+            )
+        else:
+            parsed_value = None
 
     else:
         parsed_value = None
@@ -189,12 +215,97 @@ def normalize_decimal(
         original_value=value,
         normalized_value=quantized,
         serialized_value=serialized,
-        rule_code=RULE_CODE,
+        rule_code=applied_rule_code,
         changed=_decimal_was_changed(
             original_value=value,
             serialized_value=serialized,
         ),
     )
+
+
+def _prepare_decimal_text(
+    value: str,
+) -> tuple[
+    str | None,
+    str,
+    tuple[str, str] | None,
+]:
+    text = value.strip()
+
+    if re.search(r"\d[eE][+-]?\d", text):
+        return (
+            None,
+            RULE_CODE,
+            (
+                "DEC-CIENTIFICA-001",
+                "Notação científica textual não é aceita para "
+                "campos monetários.",
+            ),
+        )
+
+    if "R$" in text:
+        if text.count("R$") != 1 or not text.startswith("R$"):
+            return (
+                None,
+                RULE_CODE,
+                (
+                    "DEC-SIMBOLO-001",
+                    "O símbolo monetário deve ser um único prefixo R$.",
+                ),
+            )
+
+        text = text[2:].strip()
+        if not text or "(" in text or ")" in text:
+            return (
+                None,
+                RULE_CODE,
+                (
+                    "DEC-SIMBOLO-001",
+                    "R$ não pode ser combinado com parênteses ou valor "
+                    "vazio.",
+                ),
+            )
+        return text, BRL_SYMBOL_RULE_CODE, None
+
+    if "(" in text or ")" in text:
+        valid_parentheses = (
+            text.startswith("(")
+            and text.endswith(")")
+            and text.count("(") == 1
+            and text.count(")") == 1
+        )
+        if not valid_parentheses:
+            return (
+                None,
+                RULE_CODE,
+                (
+                    "DEC-PARENTESES-001",
+                    "Os parênteses contábeis estão em formato inválido.",
+                ),
+            )
+
+        inner = text[1:-1].strip()
+        if not inner or inner[0] in {"+", "-"}:
+            return (
+                None,
+                RULE_CODE,
+                (
+                    "DEC-PARENTESES-001",
+                    "Parênteses contábeis não podem conter outro sinal.",
+                ),
+            )
+        return (
+            f"-{inner}",
+            ACCOUNTING_PARENTHESES_RULE_CODE,
+            None,
+        )
+
+    return text, RULE_CODE, None
+
+
+def _significant_digit_count(value: Decimal) -> int:
+    normalized = value.normalize()
+    return len(normalized.as_tuple().digits)
 
 
 def serialize_decimal(
@@ -370,6 +481,15 @@ def _parse_decimal_text(
                 )
 
             elif len(right_text) == 3:
+                if len(integer_text) >= 3:
+                    return (
+                        None,
+                        (
+                            "DEC-ESCALA-001",
+                            f"O valor possui mais de {decimal_places} "
+                            "casas decimais.",
+                        ),
+                    )
                 return (
                     None,
                     (

@@ -22,6 +22,10 @@ from src.services.reporting_service import (
     ReportingServiceError,
     generate_reports,
 )
+from src.services.rule_reconciliation_service import (
+    RuleReconciliationService,
+    reconcile_deferred_rules,
+)
 from src.services.version_resolver import (
     VERSION_PROFILES,
     VersionResolver,
@@ -47,6 +51,7 @@ __all__ = [
     "FinalStatusService",
     "ReportingService",
     "ReportingServiceError",
+    "RuleReconciliationService",
     "VERSION_PROFILES",
     "VersionResolver",
     "VersionSelectionIssue",
@@ -64,4 +69,5 @@ __all__ = [
     "validate_generated_xml",
     "resolve_version",
     "resolve_semester_period",
+    "reconcile_deferred_rules",
 ]

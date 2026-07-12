@@ -31,6 +31,7 @@ SEVERITY_BLOCKING_ERROR = "ERRO IMPEDITIVO"
 SEVERITY_ERROR = "ERRO"
 SEVERITY_INFORMATION = "INFORMAÇÃO"
 SEVERITY_NOT_EXECUTED = "REGRA NÃO EXECUTADA"
+SEVERITY_DEFERRED = "ADIADA"
 
 CIRCULAR_START_DATE = date(2021, 1, 1)
 INDIVIDUAL_THRESHOLD = Decimal("1000.00")
@@ -1481,7 +1482,7 @@ class BaseRowBusinessValidator:
         row: NormalizedBaseRow,
         row_kind: BaseRowKind,
     ) -> RowRuleResult:
-        return self._not_executed(
+        return self._deferred(
             row=row,
             row_kind=row_kind,
             code="DRO001312",
@@ -1504,7 +1505,7 @@ class BaseRowBusinessValidator:
         row: NormalizedBaseRow,
         row_kind: BaseRowKind,
     ) -> RowRuleResult:
-        return self._not_executed(
+        return self._deferred(
             row=row,
             row_kind=row_kind,
             code="DRO001314",
@@ -2182,7 +2183,7 @@ class BaseRowBusinessValidator:
         row: NormalizedBaseRow,
         row_kind: BaseRowKind,
     ) -> RowRuleResult:
-        return self._not_executed(
+        return self._deferred(
             row=row,
             row_kind=row_kind,
             code="DRO001452",
@@ -2516,6 +2517,29 @@ class BaseRowBusinessValidator:
             source=source,
             severity=SEVERITY_NOT_EXECUTED,
             status=RuleExecutionStatus.NOT_EXECUTED,
+            columns=columns,
+            message=message,
+        )
+
+    def _deferred(
+        self,
+        *,
+        row: NormalizedBaseRow,
+        row_kind: BaseRowKind,
+        code: str,
+        description: str,
+        source: str,
+        columns: tuple[str, ...],
+        message: str,
+    ) -> RowRuleResult:
+        return self._build_result(
+            row=row,
+            row_kind=row_kind,
+            code=code,
+            description=description,
+            source=source,
+            severity=SEVERITY_DEFERRED,
+            status=RuleExecutionStatus.DEFERRED,
             columns=columns,
             message=message,
         )

@@ -35,8 +35,15 @@ from src.domain.reference_tables import (
 from src.domain.regulatory_version import (
     RegulatoryVersion,
 )
+from src.domain.rule_reconciliation import (
+    RuleReconciliationResult,
+)
 from src.domain.reporting import (
+    ExternalValidationStatus,
     FinalExecutionStatus,
+    HistoricalValidationStatus,
+    LocalValidationStatus,
+    XsdValidationSummaryStatus,
 )
 from src.domain.xml_generation import (
     XmlGenerationResult,
@@ -56,6 +63,7 @@ class FinalStatusService:
         row_validation: BaseRowsValidationResult,
         grouping: EventGroupingResult,
         event_validation: EventsValidationResult,
+        reconciliation: RuleReconciliationResult,
         financial_validation: (
             EventsFinancialValidationResult
         ),
@@ -67,6 +75,32 @@ class FinalStatusService:
         xsd_result: XsdValidationResult,
     ) -> FinalStatusDecision:
         reasons: list[FinalStatusReason] = []
+        pre_rules = tuple(
+            getattr(pre_processing, "rule_results", ())
+        )
+        post_rules = tuple(
+            getattr(post_processing, "rule_results", ())
+        )
+        external_rules = self._rules_with_execution_class(
+            pre_rules,
+            "EXTERNA",
+        )
+        historical_rules = self._rules_with_execution_class(
+            post_rules,
+            "HISTÓRICO DA DATA-BASE ANTERIOR",
+        )
+        local_pre_rules = tuple(
+            rule for rule in pre_rules
+            if rule not in external_rules
+        )
+        local_post_rules = tuple(
+            rule for rule in post_rules
+            if rule not in historical_rules
+        )
+        status_externo = self._external_status(external_rules)
+        status_historico = self._historical_status(
+            historical_rules
+        )
 
         if xsd_result.has_technical_failure:
             reasons.extend(
@@ -87,6 +121,14 @@ class FinalStatusService:
             return self._decision(
                 reasons,
                 technical=True,
+                status_local=(
+                    LocalValidationStatus.TECHNICAL_FAILURE
+                ),
+                status_xsd=(
+                    XsdValidationSummaryStatus.NOT_EXECUTED
+                ),
+                status_externo=status_externo,
+                status_historico=status_historico,
             )
 
         if profile.blocks_apt:
@@ -159,6 +201,22 @@ class FinalStatusService:
             ),
             source="Validação dos eventos",
         )
+        self._append_pending_reason(
+            reasons,
+            pending=not reconciliation.is_fully_reconciled,
+            code="STATUS-RECON-NE-001",
+            message=(
+                "Existem regras adiadas sem resultado definitivo."
+            ),
+            source="Reconciliação de regras adiadas",
+            details=((
+                "codigos",
+                tuple(
+                    record.rule_code
+                    for record in reconciliation.unresolved_records
+                ),
+            ),),
+        )
 
         self._append_validity_reason(
             reasons,
@@ -203,33 +261,35 @@ class FinalStatusService:
 
         self._append_validity_reason(
             reasons,
-            valid=pre_processing.is_locally_valid,
+            valid=not self._has_rule_status(
+                local_pre_rules,
+                "REPROVADA",
+            ),
             code="STATUS-PRE-001",
             message=(
-                "Existe crítica de pré-processamento reprovada."
+                "Existe crítica local de pré-processamento "
+                "reprovada."
             ),
-            source="Pré-processamento",
+            source="Pré-processamento local",
         )
         self._append_pending_reason(
             reasons,
-            pending=bool(
-                pre_processing.not_executed_rules
+            pending=self._has_rule_status(
+                local_pre_rules,
+                "REGRA NÃO EXECUTADA",
             ),
             code="STATUS-PRE-NE-001",
             message=(
-                "Existem críticas de pré-processamento "
+                "Existem críticas locais de pré-processamento "
                 "não executadas."
             ),
-            source="Pré-processamento",
+            source="Pré-processamento local",
             details=(
                 (
                     "codigos",
-                    tuple(
-                        result.code
-                        for result in (
-                            pre_processing
-                            .not_executed_rules
-                        )
+                    self._rule_codes_with_status(
+                        local_pre_rules,
+                        "REGRA NÃO EXECUTADA",
                     ),
                 ),
             ),
@@ -237,7 +297,9 @@ class FinalStatusService:
 
         self._append_validity_reason(
             reasons,
-            valid=post_processing.is_locally_valid,
+            valid=not self._has_blocking_failure(
+                local_post_rules
+            ),
             code="STATUS-POS-001",
             message=(
                 "Existe crítica de pós-processamento reprovada."
@@ -246,8 +308,9 @@ class FinalStatusService:
         )
         self._append_pending_reason(
             reasons,
-            pending=bool(
-                post_processing.not_executed_rules
+            pending=self._has_rule_status(
+                local_post_rules,
+                "REGRA NÃO EXECUTADA",
             ),
             code="STATUS-POS-NE-001",
             message=(
@@ -258,15 +321,61 @@ class FinalStatusService:
             details=(
                 (
                     "codigos",
-                    tuple(
-                        result.code
-                        for result in (
-                            post_processing
-                            .not_executed_rules
-                        )
+                    self._rule_codes_with_status(
+                        local_post_rules,
+                        "REGRA NÃO EXECUTADA",
                     ),
                 ),
             ),
+        )
+
+        self._append_validity_reason(
+            reasons,
+            valid=(
+                status_externo
+                != ExternalValidationStatus.REPROVED
+            ),
+            code="STATUS-EXT-001",
+            message="Existe validação externa reprovada.",
+            source="Validações externas",
+        )
+        self._append_pending_reason(
+            reasons,
+            pending=(
+                status_externo
+                == ExternalValidationStatus.NOT_EXECUTED
+            ),
+            code="STATUS-EXT-NE-001",
+            message="Existem validações externas não executadas.",
+            source="Validações externas",
+            details=(("codigos", self._rule_codes_with_status(
+                external_rules,
+                "REGRA NÃO EXECUTADA",
+            )),),
+        )
+        self._append_validity_reason(
+            reasons,
+            valid=(
+                status_historico
+                != HistoricalValidationStatus.REPROVED
+            ),
+            code="STATUS-HIST-001",
+            message="Existe validação histórica reprovada.",
+            source="Validações históricas",
+        )
+        self._append_pending_reason(
+            reasons,
+            pending=(
+                status_historico
+                == HistoricalValidationStatus.NOT_EXECUTED
+            ),
+            code="STATUS-HIST-NE-001",
+            message="Existem validações históricas não executadas.",
+            source="Validações históricas",
+            details=(("codigos", self._rule_codes_with_status(
+                historical_rules,
+                "REGRA NÃO EXECUTADA",
+            )),),
         )
 
         if post_processing.warning_failed_rules:
@@ -295,6 +404,15 @@ class FinalStatusService:
                 )
             )
 
+        local_build_issues = tuple(
+            issue
+            for issue in build_result.apt_blocking_issues
+            if not issue.code.startswith((
+                "DOC-PRE-",
+                "DOC-POS-",
+            ))
+        )
+
         if not build_result.is_built:
             reasons.append(
                 FinalStatusReason(
@@ -307,7 +425,7 @@ class FinalStatusService:
                     severity="ERRO IMPEDITIVO",
                 )
             )
-        elif build_result.blocks_apt:
+        elif local_build_issues:
             reasons.append(
                 FinalStatusReason(
                     code="STATUS-DOC-002",
@@ -322,10 +440,7 @@ class FinalStatusService:
                             "codigos",
                             tuple(
                                 issue.code
-                                for issue in (
-                                    build_result
-                                    .apt_blocking_issues
-                                )
+                                for issue in local_build_issues
                             ),
                         ),
                     ),
@@ -341,19 +456,6 @@ class FinalStatusService:
                     severity="ERRO IMPEDITIVO",
                 )
             )
-        elif xml_result.blocks_apt:
-            reasons.append(
-                FinalStatusReason(
-                    code="STATUS-XML-002",
-                    message=(
-                        "O XML foi gerado para diagnóstico e "
-                        "permanece identificado como não apto."
-                    ),
-                    source="Geração do XML",
-                    severity="ERRO IMPEDITIVO",
-                )
-            )
-
         if xsd_result.is_invalid:
             reasons.append(
                 FinalStatusReason(
@@ -369,7 +471,53 @@ class FinalStatusService:
                 )
             )
 
-        return self._decision(reasons)
+        local_failed = any((
+            profile.blocks_apt,
+            not row_validation.is_locally_valid,
+            not row_validation.is_fully_verified,
+            not grouping.is_valid,
+            not event_validation.is_valid,
+            not event_validation.is_fully_verified,
+            reconciliation.blocks_apt,
+            not financial_validation.is_valid,
+            not financial_validation.is_fully_verified,
+            not references.is_valid,
+            not references.is_fully_verified,
+            self._has_rule_status(
+                local_pre_rules,
+                "REPROVADA",
+            ),
+            self._has_rule_status(
+                local_pre_rules,
+                "REGRA NÃO EXECUTADA",
+            ),
+            self._has_blocking_failure(local_post_rules),
+            self._has_rule_status(
+                local_post_rules,
+                "REGRA NÃO EXECUTADA",
+            ),
+            not build_result.is_built,
+            bool(local_build_issues),
+            not xml_result.is_generated,
+        ))
+        status_local = (
+            LocalValidationStatus.REPROVED
+            if local_failed
+            else LocalValidationStatus.APPROVED
+        )
+        status_xsd = (
+            XsdValidationSummaryStatus.REPROVED
+            if xsd_result.is_invalid
+            else XsdValidationSummaryStatus.APPROVED
+        )
+
+        return self._decision(
+            reasons,
+            status_local=status_local,
+            status_xsd=status_xsd,
+            status_externo=status_externo,
+            status_historico=status_historico,
+        )
 
     def evaluate_interrupted(
         self,
@@ -411,7 +559,105 @@ class FinalStatusService:
             reasons,
             technical=technical,
             interrupted_stage=stage,
+            status_local=(
+                LocalValidationStatus.TECHNICAL_FAILURE
+                if technical
+                else LocalValidationStatus.REPROVED
+            ),
+            status_xsd=XsdValidationSummaryStatus.NOT_EXECUTED,
+            status_externo=ExternalValidationStatus.NOT_EXECUTED,
+            status_historico=(
+                HistoricalValidationStatus.NOT_EXECUTED
+            ),
         )
+
+    @staticmethod
+    def _rules_with_execution_class(
+        rules: Iterable[object],
+        expected_value: str,
+    ) -> tuple[object, ...]:
+        return tuple(
+            rule
+            for rule in rules
+            if getattr(
+                getattr(rule, "definition", None),
+                "execution_class",
+                None,
+            ) == expected_value
+        )
+
+    @staticmethod
+    def _rule_status_value(rule: object) -> str:
+        return str(getattr(rule, "status", ""))
+
+    @classmethod
+    def _has_rule_status(
+        cls,
+        rules: Iterable[object],
+        expected_status: str,
+    ) -> bool:
+        return any(
+            cls._rule_status_value(rule) == expected_status
+            for rule in rules
+        )
+
+    @classmethod
+    def _rule_codes_with_status(
+        cls,
+        rules: Iterable[object],
+        expected_status: str,
+    ) -> tuple[str, ...]:
+        return tuple(
+            str(getattr(rule, "code", "REGRA SEM CÓDIGO"))
+            for rule in rules
+            if cls._rule_status_value(rule) == expected_status
+        )
+
+    @classmethod
+    def _has_blocking_failure(
+        cls,
+        rules: Iterable[object],
+    ) -> bool:
+        return any(
+            bool(getattr(
+                rule,
+                "has_blocking_failure",
+                cls._rule_status_value(rule) == "REPROVADA",
+            ))
+            for rule in rules
+        )
+
+    @classmethod
+    def _external_status(
+        cls,
+        rules: tuple[object, ...],
+    ) -> ExternalValidationStatus:
+        if cls._has_rule_status(rules, "REPROVADA"):
+            return ExternalValidationStatus.REPROVED
+        if cls._has_rule_status(
+            rules,
+            "REGRA NÃO EXECUTADA",
+        ):
+            return ExternalValidationStatus.NOT_EXECUTED
+        if cls._has_rule_status(rules, "APROVADA"):
+            return ExternalValidationStatus.APPROVED
+        return ExternalValidationStatus.NOT_APPLICABLE
+
+    @classmethod
+    def _historical_status(
+        cls,
+        rules: tuple[object, ...],
+    ) -> HistoricalValidationStatus:
+        if cls._has_rule_status(rules, "REPROVADA"):
+            return HistoricalValidationStatus.REPROVED
+        if cls._has_rule_status(
+            rules,
+            "REGRA NÃO EXECUTADA",
+        ):
+            return HistoricalValidationStatus.NOT_EXECUTED
+        if cls._has_rule_status(rules, "APROVADA"):
+            return HistoricalValidationStatus.APPROVED
+        return HistoricalValidationStatus.NOT_APPLICABLE
 
     @staticmethod
     def _append_validity_reason(
@@ -460,10 +706,15 @@ class FinalStatusService:
             )
         )
 
-    @staticmethod
+    @classmethod
     def _decision(
+        cls,
         reasons: Iterable[FinalStatusReason],
         *,
+        status_local: LocalValidationStatus,
+        status_xsd: XsdValidationSummaryStatus,
+        status_externo: ExternalValidationStatus,
+        status_historico: HistoricalValidationStatus,
         technical: bool = False,
         interrupted_stage: (
             ConversionStage | None
@@ -490,6 +741,10 @@ class FinalStatusService:
                     FinalExecutionStatus
                     .TECHNICAL_FAILURE
                 ),
+                status_local=status_local,
+                status_xsd=status_xsd,
+                status_externo=status_externo,
+                status_historico=status_historico,
                 message=(
                     "A execução terminou com falha "
                     f"técnica{stage_text}."
@@ -497,30 +752,63 @@ class FinalStatusService:
                 reasons=tuple(unique),
             )
 
-        blockers = tuple(
-            reason
-            for reason in unique
-            if reason.blocks_apt
+        is_apt = (
+            status_local == LocalValidationStatus.APPROVED
+            and status_xsd
+            == XsdValidationSummaryStatus.APPROVED
+            and status_externo in {
+                ExternalValidationStatus.APPROVED,
+                ExternalValidationStatus.NOT_APPLICABLE,
+            }
+            and status_historico in {
+                HistoricalValidationStatus.APPROVED,
+                HistoricalValidationStatus.NOT_APPLICABLE,
+            }
         )
 
-        if blockers:
-            summary = "; ".join(
-                reason.message.rstrip(".")
-                for reason in blockers
-            )
+        if not is_apt:
             return FinalStatusDecision(
                 status=FinalExecutionStatus.NOT_APT,
-                message=summary + ".",
+                status_local=status_local,
+                status_xsd=status_xsd,
+                status_externo=status_externo,
+                status_historico=status_historico,
+                message=cls._status_message(
+                    status_local,
+                    status_xsd,
+                    status_externo,
+                    status_historico,
+                ),
                 reasons=tuple(unique),
             )
 
         return FinalStatusDecision(
             status=FinalExecutionStatus.APT,
+            status_local=status_local,
+            status_xsd=status_xsd,
+            status_externo=status_externo,
+            status_historico=status_historico,
             message=(
                 "XML válido no XSD e sem erros "
                 "impeditivos locais ou regras pendentes."
             ),
             reasons=tuple(unique),
+        )
+
+    @staticmethod
+    def _status_message(
+        status_local: LocalValidationStatus,
+        status_xsd: XsdValidationSummaryStatus,
+        status_externo: ExternalValidationStatus,
+        status_historico: HistoricalValidationStatus,
+    ) -> str:
+        return (
+            f"Validações locais: {status_local.value}; "
+            f"Validação XSD: {status_xsd.value}; "
+            f"Validações externas: {status_externo.value}; "
+            f"Validações históricas: {status_historico.value}; "
+            "Motivo final: aptidão regulatória completa não "
+            "comprovada."
         )
 
 

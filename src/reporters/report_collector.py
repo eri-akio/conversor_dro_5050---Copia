@@ -47,10 +47,17 @@ from src.domain.regulatory_version import (
     RegulatoryVersion,
 )
 from src.domain.reporting import (
+    ExternalValidationStatus,
     ExecutionReportData,
     FinalExecutionStatus,
+    HistoricalValidationStatus,
+    LocalValidationStatus,
     ReportRecord,
     ReportRuleSummary,
+    XsdValidationSummaryStatus,
+)
+from src.domain.rule_reconciliation import (
+    RuleReconciliationResult,
 )
 from src.domain.xml_generation import (
     XmlGenerationResult,
@@ -130,6 +137,7 @@ class ExecutionReportCollector:
         row_validation: BaseRowsValidationResult,
         grouping: EventGroupingResult,
         event_validation: EventsValidationResult,
+        reconciliation: RuleReconciliationResult,
         financial_validation: (
             EventsFinancialValidationResult
         ),
@@ -163,6 +171,27 @@ class ExecutionReportCollector:
         else:
             final_status = status_decision.status
             final_message = status_decision.message
+
+        if status_decision is None:
+            status_local = (
+                LocalValidationStatus.APPROVED
+                if final_status == FinalExecutionStatus.APT
+                else LocalValidationStatus.REPROVED
+            )
+            status_xsd = (
+                XsdValidationSummaryStatus.APPROVED
+                if xsd_result.is_valid
+                else XsdValidationSummaryStatus.REPROVED
+            )
+            status_externo = ExternalValidationStatus.NOT_APPLICABLE
+            status_historico = (
+                HistoricalValidationStatus.NOT_APPLICABLE
+            )
+        else:
+            status_local = status_decision.status_local
+            status_xsd = status_decision.status_xsd
+            status_externo = status_decision.status_externo
+            status_historico = status_decision.status_historico
 
         records: list[ReportRecord] = []
         common = {
@@ -206,6 +235,12 @@ class ExecutionReportCollector:
             self._event_rule_records(
                 "AGRUPAMENTO",
                 grouping.rule_results,
+                common,
+            )
+        )
+        records.extend(
+            self._reconciliation_records(
+                reconciliation,
                 common,
             )
         )
@@ -344,6 +379,10 @@ class ExecutionReportCollector:
             xsd_path=xsd_result.xsd_path,
             data_base=header.data_base,
             profile_code=profile.code,
+            status_local=status_local,
+            status_xsd=status_xsd,
+            status_externo=status_externo,
+            status_historico=status_historico,
             final_status=final_status,
             final_message=final_message,
             records=tuple(records),
@@ -433,6 +472,10 @@ class ExecutionReportCollector:
             xsd_path=xsd_path,
             data_base=data_base,
             profile_code=profile_code,
+            status_local=status_decision.status_local,
+            status_xsd=status_decision.status_xsd,
+            status_externo=status_decision.status_externo,
+            status_historico=status_decision.status_historico,
             final_status=status_decision.status,
             final_message=status_decision.message,
             records=records,
@@ -991,6 +1034,46 @@ class ExecutionReportCollector:
                 dependency=None,
             )
             for reason in decision.reasons
+        ]
+
+    @staticmethod
+    def _reconciliation_records(
+        result: RuleReconciliationResult,
+        common: dict[str, Any],
+    ) -> list[ReportRecord]:
+        return [
+            ReportRecord(
+                **common,
+                stage=record.execution_stage,
+                sheet_name="Base",
+                row_numbers=str(record.excel_row),
+                id_evento=record.event_id,
+                columns=None,
+                original_value=record.provisional_status.value,
+                normalized_value=record.definitive_status.value,
+                rule_code=record.rule_code,
+                rule_description=(
+                    "Reconciliação de regra adiada"
+                ),
+                source=record.origin,
+                severity=(
+                    "ERRO IMPEDITIVO"
+                    if record.blocks_apt
+                    else "INFORMAÇÃO"
+                ),
+                status=record.provisional_status.value,
+                suggestion=None,
+                message=(
+                    f"{record.reason} Resultado definitivo: "
+                    f"{record.definitive_message}"
+                ),
+                dependency=record.dependency,
+                scope=record.scope,
+                definitive_result=(
+                    record.definitive_status.value
+                ),
+            )
+            for record in result.records
         ]
 
     @staticmethod

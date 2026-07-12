@@ -34,6 +34,10 @@ REQUIRED_DEPENDENCIES: tuple[tuple[str, str, str], ...] = (
     ("defusedxml", "defusedxml", "0.7.1"),
 )
 
+DEVELOPMENT_DEPENDENCIES: tuple[tuple[str, str, str], ...] = (
+    ("pytest", "pytest", "9.0.2"),
+)
+
 
 def current_python_version() -> str:
     """Retorna a versão atual do Python."""
@@ -83,16 +87,27 @@ def _version_is_compatible(
     return installed_version == expected_version
 
 
-def check_dependencies() -> tuple[DependencyStatus, ...]:
-    """Verifica todas as dependências externas exigidas."""
+def check_dependencies(
+    *,
+    include_development: bool = False,
+) -> tuple[DependencyStatus, ...]:
+    """Verifica dependências produtivas e, opcionalmente, de teste."""
 
     statuses: list[DependencyStatus] = []
+    dependencies = (
+        REQUIRED_DEPENDENCIES
+        + (
+            DEVELOPMENT_DEPENDENCIES
+            if include_development
+            else ()
+        )
+    )
 
     for (
         package_name,
         import_name,
         expected_version,
-    ) in REQUIRED_DEPENDENCIES:
+    ) in dependencies:
         installed_version = _installed_version(
             package_name
         )

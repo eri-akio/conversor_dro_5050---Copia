@@ -60,6 +60,12 @@ class RawCell:
     data_type: str
     number_format: str
     is_formula: bool
+    formula: str | None = None
+    cached_value: Any = None
+
+    @property
+    def has_cached_formula_result(self) -> bool:
+        return self.is_formula and self.cached_value is not None
 
 
 @dataclass(frozen=True, slots=True)
@@ -177,12 +183,19 @@ class ExcelWorkbookReader:
 
         source_path = self._validate_source_path(excel_path)
         workbook = None
+        values_workbook = None
 
         try:
             workbook = load_workbook(
                 filename=source_path,
                 read_only=True,
                 data_only=False,
+                keep_links=False,
+            )
+            values_workbook = load_workbook(
+                filename=source_path,
+                read_only=True,
+                data_only=True,
                 keep_links=False,
             )
 
@@ -194,7 +207,8 @@ class ExcelWorkbookReader:
             loaded_sheet_names = self.required_sheets
             sheets = {
                 sheet_name: self._read_worksheet(
-                    workbook[sheet_name]
+                    workbook[sheet_name],
+                    values_workbook[sheet_name],
                 )
                 for sheet_name in loaded_sheet_names
             }
@@ -238,6 +252,8 @@ class ExcelWorkbookReader:
         finally:
             if workbook is not None:
                 workbook.close()
+            if values_workbook is not None:
+                values_workbook.close()
 
     @staticmethod
     def _validate_source_path(
@@ -309,7 +325,11 @@ class ExcelWorkbookReader:
                 },
             )
 
-    def _read_worksheet(self, worksheet: Worksheet) -> RawSheet:
+    def _read_worksheet(
+        self,
+        worksheet: Worksheet,
+        values_worksheet: Worksheet,
+    ) -> RawSheet:
         """Lê cabeçalho e linhas de uma aba sem normalizar valores."""
 
         headers = self._read_headers(worksheet)
@@ -317,13 +337,20 @@ class ExcelWorkbookReader:
         rows: list[RawRow] = []
         ignored_empty_rows = 0
 
-        for excel_row_number, excel_cells in enumerate(
-            worksheet.iter_rows(
-                min_row=2,
-                max_col=len(headers),
-            ),
+        formula_rows = worksheet.iter_rows(
+            min_row=2,
+            max_col=len(headers),
+        )
+        value_rows = values_worksheet.iter_rows(
+            min_row=2,
+            max_col=len(headers),
+        )
+
+        for excel_row_number, row_pair in enumerate(
+            zip(formula_rows, value_rows, strict=True),
             start=2,
         ):
+            excel_cells, value_cells = row_pair
             values = tuple(cell.value for cell in excel_cells)
 
             if self._is_completely_empty(values):
@@ -332,8 +359,13 @@ class ExcelWorkbookReader:
 
             row_cells: dict[str, RawCell] = {}
 
-            for column_index, (header, cell) in enumerate(
-                zip(headers, excel_cells, strict=True),
+            for column_index, (header, cell, value_cell) in enumerate(
+                zip(
+                    headers,
+                    excel_cells,
+                    value_cells,
+                    strict=True,
+                ),
                 start=1,
             ):
                 coordinate = (
@@ -347,6 +379,7 @@ class ExcelWorkbookReader:
                     getattr(cell, "number_format", "General")
                     or "General"
                 )
+                is_formula = data_type == "f"
 
                 row_cells[header] = RawCell(
                     column_name=header,
@@ -354,7 +387,17 @@ class ExcelWorkbookReader:
                     value=cell.value,
                     data_type=data_type,
                     number_format=number_format,
-                    is_formula=data_type == "f",
+                    is_formula=is_formula,
+                    formula=(
+                        str(cell.value)
+                        if is_formula
+                        else None
+                    ),
+                    cached_value=(
+                        value_cell.value
+                        if is_formula
+                        else None
+                    ),
                 )
 
             rows.append(

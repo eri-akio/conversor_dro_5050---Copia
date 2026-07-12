@@ -63,11 +63,19 @@ considerado validado. A ocorrência é `BASE-REGRA-NE-001`.
 
 ## 5. Fórmulas
 
-Fórmulas em campos aplicáveis geram:
+Fórmulas são proibidas em identificadores e nos campos sem autorização
+explícita. Fórmulas monetárias e de data são aceitas somente quando existe
+resultado calculado armazenado e esse resultado é válido para o campo.
+
+Fórmula sem resultado armazenado gera:
 
 ```text
-BASE-NORM-FORMULA-001 — ERRO
+BASE-NORM-FORMULA-SEM-RESULTADO-001 — ERRO
 ```
+
+Fórmula aceita gera `BASE-NORM-FORMULA-AVISO-001` e preserva fórmula,
+resultado utilizado, linha e coluna. A política completa está em
+`docs/politica_entrada_excel.md`.
 
 ## 6. Como executar
 

@@ -172,7 +172,7 @@ def test_valid_row_passes_local_rules_but_keeps_deferred_rules(
     assert result_for_code(
         row,
         "DRO001312",
-    ).status == RuleExecutionStatus.NOT_EXECUTED
+    ).status == RuleExecutionStatus.DEFERRED
     assert result_for_code(
         row,
         "DRO001241",
@@ -180,8 +180,10 @@ def test_valid_row_passes_local_rules_but_keeps_deferred_rules(
 
 
 def test_sample_workbook_has_no_local_failures() -> None:
-    sample_path = Path(
-        "/mnt/data/DRO_5050_planilha_testes(1).xlsx"
+    sample_path = (
+        Path(__file__).parent
+        / "fixtures"
+        / "DRO_5050_planilha_testes.xlsx"
     )
     selection = resolve_version("2026-06")
     assert selection.profile is not None

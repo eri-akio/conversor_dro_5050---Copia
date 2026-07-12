@@ -23,9 +23,12 @@ from src.readers import (
 )
 from src.reporters import collect_execution_report
 from src.services import (
+    calculate_consolidated_events,
+    classify_events,
     generate_reports,
     generate_xml,
     resolve_version,
+    reconcile_deferred_rules,
     validate_generated_xml,
 )
 from src.validators import (
@@ -38,8 +41,10 @@ from src.validators import (
 )
 
 
-SAMPLE_PATH = Path(
-    "/mnt/data/DRO_5050_planilha_testes(1).xlsx"
+SAMPLE_PATH = (
+    Path(__file__).parent
+    / "fixtures"
+    / "DRO_5050_planilha_testes.xlsx"
 )
 
 
@@ -73,9 +78,24 @@ def prepare_report_data(tmp_path: Path):
         grouping,
         profile,
     )
+    reconciliation = reconcile_deferred_rules(
+        row_validation=row_validation,
+        event_validation=event_validation,
+    )
     financial = validate_event_financials(
         grouping,
         profile,
+    )
+    classification = classify_events(
+        grouping=grouping,
+        event_validation=event_validation,
+        financial_validation=financial,
+    )
+    consolidated = calculate_consolidated_events(
+        data_base=header.data_base,
+        grouping=grouping,
+        classification=classification,
+        financial_validation=financial,
     )
     references = validate_reference_tables(
         read_reference_tables(excel),
@@ -95,6 +115,7 @@ def prepare_report_data(tmp_path: Path):
         grouping=grouping,
         row_validation=row_validation,
         financial_validation=financial,
+        consolidated_events=consolidated.events,
     )
     build = build_final_document(
         header=header,
@@ -106,6 +127,10 @@ def prepare_report_data(tmp_path: Path):
         references=references,
         pre_processing_validation=pre,
         post_processing_validation=post,
+        consolidated_events=consolidated.events,
+        individualized_event_ids=(
+            classification.individualized_event_ids
+        ),
     )
     xml = generate_xml(
         build,
@@ -124,9 +149,12 @@ def prepare_report_data(tmp_path: Path):
         header=header,
         profile=profile,
         normalization=normalization,
+        classification=classification,
+        consolidated=consolidated,
         row_validation=row_validation,
         grouping=grouping,
         event_validation=event_validation,
+        reconciliation=reconciliation,
         financial_validation=financial,
         references=references,
         pre_processing=pre,
@@ -202,7 +230,7 @@ def test_xlsx_contains_required_sheets_and_columns(
     headers = tuple(
         cell.value for cell in occurrences[1]
     )
-    assert len(headers) == 17
+    assert len(headers) == 19
 
     for header in (
         "Resultado Final",
@@ -215,6 +243,8 @@ def test_xlsx_contains_required_sheets_and_columns(
         "Gravidade",
         "Status",
         "Sugestão",
+        "Escopo",
+        "Resultado Definitivo",
     ):
         assert header in headers
 

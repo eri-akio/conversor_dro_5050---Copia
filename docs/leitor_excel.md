@@ -115,14 +115,15 @@ total de fórmulas
 
 ## 4. Por que preservar fórmulas
 
-O leitor usa:
+O leitor usa duas visões do mesmo arquivo:
 
 ```python
 data_only=False
+data_only=True
 ```
 
-Portanto, uma célula com fórmula é mantida como fórmula, em vez de
-retornar silenciosamente um valor armazenado anteriormente pelo Excel.
+Assim, uma célula preserva a fórmula original e, separadamente, o último
+resultado calculado armazenado no arquivo. O leitor não calcula fórmulas.
 
 Isso permite que uma etapa posterior decida se fórmulas são:
 
@@ -131,7 +132,8 @@ Isso permite que uma etapa posterior decida se fórmulas são:
 - aceitas somente com valor calculado;
 - registradas como inconsistência.
 
-O leitor não toma essa decisão regulatória.
+O normalizador aplica a decisão documentada em
+`docs/politica_entrada_excel.md`.
 
 ---
 

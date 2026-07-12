@@ -408,8 +408,10 @@ def test_unused_codes_are_informational(
 
 
 def test_sample_workbook_passes_reference_validation() -> None:
-    path = Path(
-        "/mnt/data/DRO_5050_planilha_testes(1).xlsx"
+    path = (
+        Path(__file__).parent
+        / "fixtures"
+        / "DRO_5050_planilha_testes.xlsx"
     )
 
     read_result, validation = process_reference_tables(path)

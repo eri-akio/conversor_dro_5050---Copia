@@ -114,6 +114,8 @@ Exemplos aceitos:
 1427.98        → 1427.98
 1.552.165,46   → 1552165.46
 -1.200,00      → -1200.00
+R$ 1.427,98    → 1427.98
+(210,00)       → -210.00
 ```
 
 A saída padrão possui duas casas:
@@ -153,8 +155,14 @@ Erros:
 | `DEC-ESCALA-001` | Casas decimais excedentes |
 | `DEC-TAMANHO-001` | Parte inteira excedente |
 | `DEC-SINAL-001` | Valor negativo não permitido pela chamada |
+| `DEC-SIMBOLO-001` | Símbolo monetário inválido |
+| `DEC-PARENTESES-001` | Parênteses contábeis inválidos |
+| `DEC-CIENTIFICA-001` | Notação científica textual |
+| `DEC-PRECISAO-001` | Risco de perda de precisão numérica |
 
 O normalizador não converte valor inválido para `0.00`.
+Transformações de `R$` e parênteses usam códigos de regra próprios e geram
+aviso auditável na normalização da Base.
 
 ---
 

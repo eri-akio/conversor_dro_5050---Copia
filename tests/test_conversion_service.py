@@ -9,7 +9,12 @@ from src.domain.conversion import (
     ConversionStageStatus,
 )
 from src.domain.reporting import (
+    ExternalValidationStatus,
     FinalExecutionStatus,
+    FinalValidationStatus,
+    HistoricalValidationStatus,
+    LocalValidationStatus,
+    XsdValidationSummaryStatus,
 )
 from src.domain.xsd_validation import (
     XsdValidationStatus,
@@ -17,8 +22,10 @@ from src.domain.xsd_validation import (
 from src.services import convert_excel
 
 
-SAMPLE_PATH = Path(
-    "/mnt/data/DRO_5050_planilha_testes(1).xlsx"
+SAMPLE_PATH = (
+    Path(__file__).parent
+    / "fixtures"
+    / "DRO_5050_planilha_testes.xlsx"
 )
 
 
@@ -31,6 +38,19 @@ def test_complete_service_returns_single_result(
     )
 
     assert result.status == FinalExecutionStatus.NOT_APT
+    assert result.status_local == LocalValidationStatus.REPROVED
+    assert result.status_xsd == (
+        XsdValidationSummaryStatus.REPROVED
+    )
+    assert result.status_externo == (
+        ExternalValidationStatus.NOT_EXECUTED
+    )
+    assert result.status_historico == (
+        HistoricalValidationStatus.NOT_EXECUTED
+    )
+    assert result.status_final == (
+        FinalValidationStatus.NOT_APT_FOR_SUBMISSION
+    )
     assert result.exit_code == 0
     assert result.execution_id.startswith("DRO5050-")
     assert result.artifacts.xml_path is not None
@@ -48,13 +68,39 @@ def test_complete_service_returns_single_result(
     )
     assert xsd_result.status == XsdValidationStatus.INVALID
 
+    reconciliation = result.output(
+        ConversionStage.RECONCILE_RULES
+    )
+    assert reconciliation.records
+    assert reconciliation.is_fully_reconciled
+    assert not reconciliation.unresolved_records
+
     report_result = result.output(
         ConversionStage.GENERATE_REPORTS
+    )
+    assert report_result.data.status_final == (
+        FinalValidationStatus.NOT_APT_FOR_SUBMISSION
     )
     assert report_result.data.execution_id == result.execution_id
     assert (
         report_result.data.final_status
         == result.status
+    )
+    assert report_result.data.status_local == result.status_local
+    assert report_result.data.status_xsd == result.status_xsd
+    assert (
+        report_result.data.status_externo
+        == result.status_externo
+    )
+    assert (
+        report_result.data.status_historico
+        == result.status_historico
+    )
+    assert any(
+        record.status == "ADIADA"
+        and record.scope == "LINHA"
+        and record.definitive_result is not None
+        for record in report_result.data.records
     )
 
     assert result.stage_records[-1].stage == (

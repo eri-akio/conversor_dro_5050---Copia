@@ -58,6 +58,9 @@ from src.services.final_status_service import (
 from src.services.reporting_service import (
     ReportingService,
 )
+from src.services.rule_reconciliation_service import (
+    reconcile_deferred_rules,
+)
 from src.services.version_resolver import (
     resolve_version,
 )
@@ -393,6 +396,16 @@ class ConversionService:
                 "Consistência dos eventos validada.",
             )
 
+            reconciliation = self._execute(
+                state,
+                ConversionStage.RECONCILE_RULES,
+                lambda: reconcile_deferred_rules(
+                    row_validation=row_validation,
+                    event_validation=event_validation,
+                ),
+                "Regras adiadas reconciliadas no nível do evento.",
+            )
+
             financial_validation = self._execute(
                 state,
                 ConversionStage.VALIDATE_FINANCIALS,
@@ -576,6 +589,7 @@ class ConversionService:
                     row_validation=row_validation,
                     grouping=grouping,
                     event_validation=event_validation,
+                    reconciliation=reconciliation,
                     financial_validation=(
                         financial_validation
                     ),
@@ -632,6 +646,7 @@ class ConversionService:
                 row_validation=row_validation,
                 grouping=grouping,
                 event_validation=event_validation,
+                reconciliation=reconciliation,
                 financial_validation=(
                     financial_validation
                 ),

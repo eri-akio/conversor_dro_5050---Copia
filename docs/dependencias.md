@@ -37,10 +37,9 @@ Estas bibliotecas são necessárias para executar a aplicação.
 
 | Biblioteca | Versão | Finalidade |
 |---|---:|---|
-| `openpyxl` | `3.1.5` | Ler o Excel de entrada preservando linhas, fórmulas e formatos |
+| `openpyxl` | `3.1.5` | Ler o Excel de entrada e gerar o relatório `.xlsx` |
 | `lxml` | `6.1.1` | Construir XML e validar o documento contra o XSD |
 | `defusedxml` | `0.7.1` | Adicionar proteção contra ataques e expansões XML maliciosas |
-| `artifact_tool_v2` | `2.8.4` | Gerar, formatar e inspecionar o relatório `.xlsx` |
 
 ### 2.1. Por que não usar `pandas`
 
@@ -81,12 +80,11 @@ XML potencialmente malformado ou malicioso. Sua presença não substitui:
 - tratamento de arquivo corrompido;
 - validação do conteúdo.
 
-### 2.4. Por que usar `artifact_tool_v2`
+### 2.4. Relatórios Excel
 
-Os relatórios Excel precisam de formatação, tabelas, fórmulas, congelamento de
-painéis e inspeção automática de erros. O `artifact_tool_v2` é utilizado
-somente na camada de relatórios; a leitura da planilha de entrada continua com
-`openpyxl`.
+O projeto utiliza `openpyxl` tanto para a leitura da planilha de entrada
+quanto para a geração do relatório `.xlsx`. Não há uma ferramenta de
+artefatos adicional nos arquivos de requisitos nem no código produtivo.
 
 ---
 
@@ -179,7 +177,6 @@ Esse comando instala:
 openpyxl
 lxml
 defusedxml
-artifact_tool_v2
 pytest
 ```
 
@@ -205,7 +202,6 @@ Também é possível consultar diretamente:
 python -m pip show openpyxl
 python -m pip show lxml
 python -m pip show defusedxml
-python -m pip show artifact_tool_v2
 python -m pip show pytest
 ```
 
@@ -222,8 +218,11 @@ Esse comando deve abrir uma pequena janela de teste.
 ## 9. Executar os testes
 
 ```powershell
-python -m pytest -v
+python -m pytest -q
 ```
+
+Para exibir cada caso de teste individualmente, use
+`python -m pytest -v`.
 
 O comando antigo com `unittest` continua disponível:
 

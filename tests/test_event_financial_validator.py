@@ -306,8 +306,10 @@ def test_sample_workbook_passes_all_financial_rules() -> None:
     from src.services.version_resolver import resolve_version
     from src.validators import validate_base_rows
 
-    path = Path(
-        "/mnt/data/DRO_5050_planilha_testes(1).xlsx"
+    path = (
+        Path(__file__).parent
+        / "fixtures"
+        / "DRO_5050_planilha_testes.xlsx"
     )
     profile = resolve_version("2026-06").profile
     assert profile is not None

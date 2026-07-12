@@ -10,8 +10,13 @@ from types import MappingProxyType
 from typing import Any, Mapping
 
 from src.domain.reporting import (
+    ExternalValidationStatus,
     FinalExecutionStatus,
+    FinalValidationStatus,
+    HistoricalValidationStatus,
+    LocalValidationStatus,
     ReportArtifacts,
+    XsdValidationSummaryStatus,
 )
 
 
@@ -28,6 +33,7 @@ class ConversionStage(StrEnum):
     VALIDATE_ROWS = "VALIDAÇÃO POR LINHA"
     GROUP_EVENTS = "AGRUPAMENTO DE EVENTOS"
     VALIDATE_EVENTS = "CONSISTÊNCIA DOS EVENTOS"
+    RECONCILE_RULES = "RECONCILIAÇÃO DE REGRAS ADIADAS"
     VALIDATE_FINANCIALS = "VALIDAÇÃO FINANCEIRA"
     CLASSIFY_EVENTS = "CLASSIFICAÇÃO DOS EVENTOS"
     CALCULATE_CONSOLIDATED = "CÁLCULO DOS CONSOLIDADOS"
@@ -117,6 +123,10 @@ class FinalStatusDecision:
     """Decisão única do serviço de consolidação."""
 
     status: FinalExecutionStatus
+    status_local: LocalValidationStatus
+    status_xsd: XsdValidationSummaryStatus
+    status_externo: ExternalValidationStatus
+    status_historico: HistoricalValidationStatus
     message: str
     reasons: tuple[FinalStatusReason, ...]
 
@@ -204,6 +214,28 @@ class ConversionResult:
     @property
     def status(self) -> FinalExecutionStatus:
         return self.decision.status
+
+    @property
+    def status_local(self) -> LocalValidationStatus:
+        return self.decision.status_local
+
+    @property
+    def status_xsd(self) -> XsdValidationSummaryStatus:
+        return self.decision.status_xsd
+
+    @property
+    def status_externo(self) -> ExternalValidationStatus:
+        return self.decision.status_externo
+
+    @property
+    def status_historico(self) -> HistoricalValidationStatus:
+        return self.decision.status_historico
+
+    @property
+    def status_final(self) -> FinalValidationStatus:
+        return FinalValidationStatus.from_execution_status(
+            self.decision.status
+        )
 
     @property
     def final_message(self) -> str:

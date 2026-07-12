@@ -78,6 +78,38 @@ LEGACY_PROFILE_CODES = frozenset(
     {"DRO_2020_12", "DRO_2025_06"}
 )
 
+FORMULA_IDENTIFICATION_FIELDS = frozenset({
+    "idEvento",
+    "idEventoAgregador",
+    "idBacen",
+    "codigoEventoOrigem",
+    "codSistemaOrigem",
+    "contaBalAnaliticoDebito",
+    "contaBalAnaliticoCredito",
+    "contaCosifDebito",
+    "contaCosifCredito",
+})
+FORMULA_MONETARY_FIELDS = frozenset({
+    "totalPerdaEfetiva",
+    "totalProvisao",
+    "totalRecuperado",
+    "valorTotalRisco",
+    "valorRisco",
+    "valorPerdaEfetiva",
+    "valorProvisao",
+    "valorRecuperacao",
+})
+FORMULA_DATE_FIELDS = frozenset({
+    "dataDescoberta",
+    "dataOcorrencia",
+    "dataContabilizacao",
+    "dataExclusao",
+})
+AUDITABLE_DECIMAL_RULES = frozenset({
+    "REMOCAO_SIMBOLO_BRL",
+    "CONVERSAO_PARENTESES_CONTABEIS",
+})
+
 
 class BaseRowNormalizer:
     """Normaliza as células conhecidas de uma linha."""
@@ -171,6 +203,45 @@ class BaseRowNormalizer:
                     )
                 )
 
+            if cell.is_formula and result.is_valid:
+                issues.append(
+                    BaseRowIssue(
+                        code="BASE-NORM-FORMULA-AVISO-001",
+                        severity=SEVERITY_WARNING,
+                        message=(
+                            "Fórmula aceita com o último resultado "
+                            "calculado e armazenado no arquivo Excel."
+                        ),
+                        row_number=row.row_number,
+                        column_name=column_name,
+                        coordinate=cell.coordinate,
+                        original_value=cell.formula,
+                        normalized_value=result.serialized_value,
+                        rule_code="NORM-FORMULA-RESULTADO-001",
+                    )
+                )
+
+            if (
+                result.is_valid
+                and result.rule_code in AUDITABLE_DECIMAL_RULES
+            ):
+                issues.append(
+                    BaseRowIssue(
+                        code="BASE-NORM-MONETARIO-AVISO-001",
+                        severity=SEVERITY_WARNING,
+                        message=(
+                            "Transformação monetária não trivial "
+                            "aplicada conforme a política de entrada."
+                        ),
+                        row_number=row.row_number,
+                        column_name=column_name,
+                        coordinate=cell.coordinate,
+                        original_value=cell.value,
+                        normalized_value=result.serialized_value,
+                        rule_code=result.rule_code,
+                    )
+                )
+
             if (
                 column_name in BASE_FUTURE_COLUMNS
                 and not applicable
@@ -235,17 +306,44 @@ class BaseRowNormalizer:
         cell: RawCell,
     ) -> NormalizationResult[Any]:
         if cell.is_formula:
-            return invalid_result(
-                original_value=cell.value,
-                rule_code="NORM-FORMULA-001",
-                issue_code="BASE-NORM-FORMULA-001",
-                issue_message=(
-                    "Fórmula encontrada. O openpyxl não calcula "
-                    "o resultado com segurança."
-                ),
-            )
+            if column_name in FORMULA_IDENTIFICATION_FIELDS:
+                return invalid_result(
+                    original_value=cell.formula,
+                    rule_code="NORM-FORMULA-PROIBIDA-001",
+                    issue_code="BASE-NORM-FORMULA-ID-001",
+                    issue_message=(
+                        "Fórmulas são proibidas em campos de "
+                        "identificação."
+                    ),
+                )
 
-        value = cell.value
+            if column_name not in (
+                FORMULA_MONETARY_FIELDS | FORMULA_DATE_FIELDS
+            ):
+                return invalid_result(
+                    original_value=cell.formula,
+                    rule_code="NORM-FORMULA-PROIBIDA-001",
+                    issue_code="BASE-NORM-FORMULA-CAMPO-001",
+                    issue_message=(
+                        "Fórmulas não são permitidas neste campo."
+                    ),
+                )
+
+            if not cell.has_cached_formula_result:
+                return invalid_result(
+                    original_value=cell.formula,
+                    rule_code="NORM-FORMULA-SEM-RESULTADO-001",
+                    issue_code="BASE-NORM-FORMULA-SEM-RESULTADO-001",
+                    issue_message=(
+                        "A célula contém fórmula, mas não possui "
+                        "resultado calculado armazenado. Abra a planilha "
+                        "no Excel, recalcule e salve antes da conversão."
+                    ),
+                )
+
+            value = cell.cached_value
+        else:
+            value = cell.value
 
         normalizers: dict[
             str,
@@ -408,7 +506,18 @@ class BaseRowNormalizer:
                 ),
             )
 
-        return normalizer()
+        result = normalizer()
+        if cell.is_formula and result.is_absent:
+            return invalid_result(
+                original_value=cell.formula,
+                rule_code="NORM-FORMULA-RESULTADO-INVALIDO-001",
+                issue_code="BASE-NORM-FORMULA-RESULTADO-INVALIDO-001",
+                issue_message=(
+                    "A fórmula possui resultado armazenado vazio ou "
+                    "incompatível com o campo."
+                ),
+            )
+        return result
 
     def _is_applicable(
         self,
@@ -439,6 +548,10 @@ class BaseRowNormalizer:
             column_name=column_name,
             coordinate=cell.coordinate,
             original_value=cell.value,
-            normalized_value=result.serialized_value,
+            normalized_value=(
+                cell.cached_value
+                if cell.is_formula and result.is_invalid
+                else result.serialized_value
+            ),
             rule_code=result.rule_code,
         )

@@ -18,6 +18,61 @@ class FinalExecutionStatus(StrEnum):
     TECHNICAL_FAILURE = "FALHA TÉCNICA"
 
 
+class FinalValidationStatus(StrEnum):
+    """Valor técnico e estável da decisão regulatória final."""
+
+    APT_FOR_SUBMISSION = "APTO_PARA_ENVIO"
+    NOT_APT_FOR_SUBMISSION = "NAO_APTO_PARA_ENVIO"
+    TECHNICAL_FAILURE = "FALHA_TECNICA"
+
+    @classmethod
+    def from_execution_status(
+        cls,
+        status: FinalExecutionStatus,
+    ) -> "FinalValidationStatus":
+        return {
+            FinalExecutionStatus.APT: cls.APT_FOR_SUBMISSION,
+            FinalExecutionStatus.NOT_APT: cls.NOT_APT_FOR_SUBMISSION,
+            FinalExecutionStatus.TECHNICAL_FAILURE: (
+                cls.TECHNICAL_FAILURE
+            ),
+        }[status]
+
+
+class LocalValidationStatus(StrEnum):
+    """Resultado das validações executáveis no ambiente local."""
+
+    APPROVED = "APROVADO"
+    REPROVED = "REPROVADO"
+    TECHNICAL_FAILURE = "FALHA_TECNICA"
+
+
+class XsdValidationSummaryStatus(StrEnum):
+    """Resultado regulatório resumido da validação XSD."""
+
+    APPROVED = "APROVADO"
+    REPROVED = "REPROVADO"
+    NOT_EXECUTED = "NAO_EXECUTADO"
+
+
+class ExternalValidationStatus(StrEnum):
+    """Resultado das regras dependentes de bases externas."""
+
+    APPROVED = "APROVADO"
+    REPROVED = "REPROVADO"
+    NOT_EXECUTED = "NAO_EXECUTADO"
+    NOT_APPLICABLE = "NAO_APLICAVEL"
+
+
+class HistoricalValidationStatus(StrEnum):
+    """Resultado das regras dependentes de remessa anterior."""
+
+    APPROVED = "APROVADO"
+    REPROVED = "REPROVADO"
+    NOT_EXECUTED = "NAO_EXECUTADO"
+    NOT_APPLICABLE = "NAO_APLICAVEL"
+
+
 @dataclass(frozen=True, slots=True)
 class ReportRecord:
     """Linha rastreável do relatório de ocorrências."""
@@ -43,6 +98,8 @@ class ReportRecord:
     suggestion: str | None
     message: str
     dependency: str | None = None
+    scope: str | None = None
+    definitive_result: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -78,6 +135,10 @@ class ExecutionReportData:
     xsd_path: Path | None
     data_base: str
     profile_code: str
+    status_local: LocalValidationStatus
+    status_xsd: XsdValidationSummaryStatus
+    status_externo: ExternalValidationStatus
+    status_historico: HistoricalValidationStatus
     final_status: FinalExecutionStatus
     final_message: str
     records: tuple[ReportRecord, ...]
@@ -90,6 +151,12 @@ class ExecutionReportData:
         return (
             self.finished_at - self.started_at
         ).total_seconds()
+
+    @property
+    def status_final(self) -> FinalValidationStatus:
+        return FinalValidationStatus.from_execution_status(
+            self.final_status
+        )
 
     @property
     def metric_map(self) -> Mapping[str, str | int]:

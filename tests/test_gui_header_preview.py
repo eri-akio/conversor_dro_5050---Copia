@@ -9,8 +9,10 @@ from src.gui.header_preview_service import (
 )
 
 
-SAMPLE_PATH = Path(
-    "/mnt/data/DRO_5050_planilha_testes(1).xlsx"
+SAMPLE_PATH = (
+    Path(__file__).parent
+    / "fixtures"
+    / "DRO_5050_planilha_testes.xlsx"
 )
 
 

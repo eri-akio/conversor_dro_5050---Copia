@@ -107,6 +107,18 @@ def test_read_valid_workbook_and_preserve_rows(
         .get_cell("valorPerdaEfetiva")
         .is_formula
     )
+    assert (
+        second_row
+        .get_cell("valorPerdaEfetiva")
+        .formula
+        == "=SUM(B2,500)"
+    )
+    assert (
+        second_row
+        .get_cell("valorPerdaEfetiva")
+        .cached_value
+        is None
+    )
 
     assert result.total_formulas == 1
     assert result.total_rows == 5

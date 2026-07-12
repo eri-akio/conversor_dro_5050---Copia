@@ -46,6 +46,8 @@ OCCURRENCE_HEADERS = (
     "Sugestão",
     "Mensagem",
     "Dependência",
+    "Escopo",
+    "Resultado Definitivo",
 )
 
 
@@ -107,6 +109,10 @@ class XlsxReportWriter:
 
         metadata = (
             ("Resultado final", data.final_status.value),
+            ("Status local", data.status_local.value),
+            ("Status XSD", data.status_xsd.value),
+            ("Status externo", data.status_externo.value),
+            ("Status histórico", data.status_historico.value),
             ("Mensagem final", data.final_message),
         )
 
@@ -273,6 +279,8 @@ class XlsxReportWriter:
                     record.suggestion,
                     record.message,
                     record.dependency,
+                    record.scope,
+                    record.definitive_result,
                 )
             )
 

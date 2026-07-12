@@ -325,7 +325,11 @@ def test_risk_only_event_cannot_have_accounting_block(
 
 
 def test_sample_workbook_groups_30_rows_into_15_events() -> None:
-    path = Path('/mnt/data/DRO_5050_planilha_testes(1).xlsx')
+    path = (
+        Path(__file__).parent
+        / "fixtures"
+        / "DRO_5050_planilha_testes.xlsx"
+    )
     profile = resolve_version('2026-06').profile
     assert profile is not None
     normalization = read_and_normalize_base(

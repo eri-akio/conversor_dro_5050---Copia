@@ -8,7 +8,14 @@ from datetime import datetime
 from pathlib import Path
 
 from src.domain.conversion import ConversionRequest
-from src.domain.reporting import ExecutionReportData, FinalExecutionStatus
+from src.domain.reporting import (
+    ExternalValidationStatus,
+    ExecutionReportData,
+    FinalExecutionStatus,
+    HistoricalValidationStatus,
+    LocalValidationStatus,
+    XsdValidationSummaryStatus,
+)
 from src.gui.models import GuiOutputDirectories
 from src.services.reporting_service import ReportingService
 
@@ -25,6 +32,12 @@ class OutputArtifactsOnlyTests(unittest.TestCase):
             xsd_path=None,
             data_base="2026-06",
             profile_code="DRO_2025_06",
+            status_local=LocalValidationStatus.APPROVED,
+            status_xsd=XsdValidationSummaryStatus.APPROVED,
+            status_externo=ExternalValidationStatus.NOT_APPLICABLE,
+            status_historico=(
+                HistoricalValidationStatus.NOT_APPLICABLE
+            ),
             final_status=FinalExecutionStatus.APT,
             final_message="Processamento concluído.",
             records=(),

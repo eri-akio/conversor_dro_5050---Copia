@@ -10,9 +10,13 @@ from pathlib import Path
 from openpyxl import load_workbook
 
 from src.domain.reporting import (
+    ExternalValidationStatus,
     ExecutionReportData,
     FinalExecutionStatus,
+    HistoricalValidationStatus,
+    LocalValidationStatus,
     ReportRecord,
+    XsdValidationSummaryStatus,
 )
 from src.reporters.xlsx_reporter import (
     OCCURRENCE_HEADERS,
@@ -71,6 +75,12 @@ class SimplifiedXlsxReporterTests(unittest.TestCase):
             xsd_path=Path("schema.xsd"),
             data_base="2026-06",
             profile_code="DRO_2025_06",
+            status_local=LocalValidationStatus.APPROVED,
+            status_xsd=XsdValidationSummaryStatus.APPROVED,
+            status_externo=ExternalValidationStatus.NOT_EXECUTED,
+            status_historico=(
+                HistoricalValidationStatus.NOT_EXECUTED
+            ),
             final_status=FinalExecutionStatus.NOT_APT,
             final_message="Há pendências",
             records=(record,),
@@ -95,20 +105,28 @@ class SimplifiedXlsxReporterTests(unittest.TestCase):
         }
         self.assertTrue(REMOVED_SUMMARY_LABELS.isdisjoint(summary_values))
         self.assertEqual(summary["A4"].value, "Resultado final")
-        self.assertEqual(summary["A5"].value, "Mensagem final")
+        self.assertEqual(summary["A5"].value, "Status local")
+        self.assertEqual(summary["B5"].value, "APROVADO")
+        self.assertEqual(summary["A6"].value, "Status XSD")
+        self.assertEqual(summary["B6"].value, "APROVADO")
+        self.assertEqual(summary["A7"].value, "Status externo")
+        self.assertEqual(summary["B7"].value, "NAO_EXECUTADO")
+        self.assertEqual(summary["A8"].value, "Status histórico")
+        self.assertEqual(summary["B8"].value, "NAO_EXECUTADO")
+        self.assertEqual(summary["A9"].value, "Mensagem final")
         self.assertIn("$M$2:$M$2", summary["H4"].value)
         self.assertIn("$N$2:$N$2", summary["H8"].value)
 
         occurrences = workbook["Ocorrencias"]
         headers = tuple(cell.value for cell in occurrences[1])
         self.assertEqual(headers, OCCURRENCE_HEADERS)
-        self.assertEqual(len(headers), 17)
+        self.assertEqual(len(headers), 19)
         self.assertTrue(REMOVED_OCCURRENCE_HEADERS.isdisjoint(headers))
         self.assertEqual(occurrences["A2"].value, "NÃO APTO PARA ENVIO")
         self.assertEqual(occurrences["M2"].value, "ERRO IMPEDITIVO")
         self.assertEqual(occurrences["N2"].value, "REPROVADA")
         self.assertEqual(occurrences.freeze_panes, "A2")
-        self.assertEqual(occurrences.tables["OccurrencesTable"].ref, "A1:Q2")
+        self.assertEqual(occurrences.tables["OccurrencesTable"].ref, "A1:S2")
 
 
 if __name__ == "__main__":

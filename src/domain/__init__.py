@@ -69,13 +69,22 @@ from src.domain.pre_processing import (
     PreProcessingValidationResult,
 )
 from src.domain.reporting import (
+    ExternalValidationStatus,
     ExecutionReportData,
     FinalExecutionStatus,
+    FinalValidationStatus,
+    HistoricalValidationStatus,
+    LocalValidationStatus,
     ReportArtifacts,
     ReportGenerationIssue,
     ReportGenerationResult,
     ReportRecord,
     ReportRuleSummary,
+    XsdValidationSummaryStatus,
+)
+from src.domain.rule_reconciliation import (
+    RuleReconciliationRecord,
+    RuleReconciliationResult,
 )
 from src.domain.conversion import (
     ConversionArtifacts,
@@ -161,12 +170,19 @@ __all__ = [
     "FinalStatusReason",
     "freeze_stage_outputs",
     "ExecutionReportData",
+    "ExternalValidationStatus",
     "FinalExecutionStatus",
+    "FinalValidationStatus",
+    "HistoricalValidationStatus",
+    "LocalValidationStatus",
     "ReportArtifacts",
     "ReportGenerationIssue",
     "ReportGenerationResult",
     "ReportRecord",
     "ReportRuleSummary",
+    "RuleReconciliationRecord",
+    "RuleReconciliationResult",
+    "XsdValidationSummaryStatus",
     "ReferenceTableData",
     "ReferenceTableKind",
     "ReferenceTableRecord",

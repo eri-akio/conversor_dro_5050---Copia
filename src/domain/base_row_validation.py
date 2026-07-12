@@ -16,6 +16,7 @@ class RuleExecutionStatus(StrEnum):
     FAILED = "REPROVADA"
     NOT_APPLICABLE = "NÃO APLICÁVEL"
     NOT_EXECUTED = "REGRA NÃO EXECUTADA"
+    DEFERRED = "ADIADA"
 
 
 class BaseRowKind(StrEnum):
@@ -77,6 +78,14 @@ class BaseRowValidationResult:
             result
             for result in self.rule_results
             if result.status == RuleExecutionStatus.NOT_EXECUTED
+        )
+
+    @property
+    def deferred_rules(self) -> tuple[RowRuleResult, ...]:
+        return tuple(
+            result
+            for result in self.rule_results
+            if result.status == RuleExecutionStatus.DEFERRED
         )
 
     @property
@@ -147,4 +156,12 @@ class BaseRowsValidationResult:
             result
             for result in self.rule_results
             if result.status == RuleExecutionStatus.NOT_EXECUTED
+        )
+
+    @property
+    def deferred_rules(self) -> tuple[RowRuleResult, ...]:
+        return tuple(
+            result
+            for result in self.rule_results
+            if result.status == RuleExecutionStatus.DEFERRED
         )

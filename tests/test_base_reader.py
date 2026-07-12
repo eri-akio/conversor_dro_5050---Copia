@@ -2,9 +2,14 @@
 
 from __future__ import annotations
 
+from datetime import date
+from decimal import Decimal
 from pathlib import Path
+from xml.etree import ElementTree
+from zipfile import ZIP_DEFLATED, ZipFile
 
 from openpyxl import Workbook, load_workbook
+from openpyxl.utils.datetime import to_excel
 
 from src.config import BASE_ALL_COLUMNS
 from src.domain.normalization import NormalizationStatus
@@ -118,6 +123,60 @@ def create_workbook(
 
     workbook.save(destination)
     workbook.close()
+
+
+def inject_cached_formula_result(
+    workbook_path: Path,
+    *,
+    coordinate: str,
+    cached_value: str,
+    cell_type: str | None = None,
+) -> None:
+    """Inclui no XLSX um resultado salvo sem calcular a fórmula."""
+
+    temporary_path = workbook_path.with_name(
+        workbook_path.stem + "_cached.xlsx"
+    )
+    namespace = {
+        "main": (
+            "http://schemas.openxmlformats.org/"
+            "spreadsheetml/2006/main"
+        )
+    }
+
+    with ZipFile(workbook_path, "r") as source, ZipFile(
+        temporary_path,
+        "w",
+        compression=ZIP_DEFLATED,
+    ) as destination:
+        for item in source.infolist():
+            content = source.read(item.filename)
+            if item.filename == "xl/worksheets/sheet1.xml":
+                root = ElementTree.fromstring(content)
+                cell = root.find(
+                    f".//main:c[@r='{coordinate}']",
+                    namespace,
+                )
+                assert cell is not None
+                value_node = cell.find("main:v", namespace)
+                if value_node is None:
+                    value_node = ElementTree.SubElement(
+                        cell,
+                        f"{{{namespace['main']}}}v",
+                    )
+                value_node.text = cached_value
+                if cell_type is None:
+                    cell.attrib.pop("t", None)
+                else:
+                    cell.set("t", cell_type)
+                content = ElementTree.tostring(
+                    root,
+                    encoding="utf-8",
+                    xml_declaration=True,
+                )
+            destination.writestr(item, content)
+
+    temporary_path.replace(workbook_path)
 
 
 def profile_for(data_base: str):
@@ -341,9 +400,181 @@ def test_formula_in_applicable_field_is_invalid(
 
     assert not result.is_valid
     assert any(
-        issue.code == "BASE-NORM-FORMULA-001"
+        issue.code == "BASE-NORM-FORMULA-SEM-RESULTADO-001"
         for issue in result.blocking_issues
     )
+
+
+def test_monetary_formula_with_cached_result_is_accepted(
+    tmp_path: Path,
+) -> None:
+    excel_path = tmp_path / "formula_monetaria.xlsx"
+    create_workbook(excel_path, rows=[valid_row_values()])
+    workbook = load_workbook(excel_path)
+    headers = {
+        cell.value: cell.column for cell in workbook["Base"][1]
+    }
+    target = workbook["Base"].cell(
+        row=2,
+        column=headers["valorPerdaEfetiva"],
+        value="=1000+427.98",
+    )
+    coordinate = target.coordinate
+    workbook.save(excel_path)
+    workbook.close()
+    inject_cached_formula_result(
+        excel_path,
+        coordinate=coordinate,
+        cached_value="1427.98",
+    )
+
+    excel = read_excel(excel_path)
+    cell = excel.get_sheet("Base").rows[0].get_cell(
+        "valorPerdaEfetiva"
+    )
+    result = read_and_normalize_base(
+        excel,
+        profile_for("2026-06"),
+    )
+
+    assert cell.formula == "=1000+427.98"
+    assert cell.cached_value == 1427.98
+    assert result.rows[0].get_value("valorPerdaEfetiva") == (
+        Decimal("1427.98")
+    )
+    assert any(
+        issue.code == "BASE-NORM-FORMULA-AVISO-001"
+        for issue in result.issues
+    )
+
+
+def test_date_formula_with_cached_result_is_accepted(
+    tmp_path: Path,
+) -> None:
+    excel_path = tmp_path / "formula_data.xlsx"
+    create_workbook(excel_path, rows=[valid_row_values()])
+    workbook = load_workbook(excel_path)
+    headers = {
+        cell.value: cell.column for cell in workbook["Base"][1]
+    }
+    target = workbook["Base"].cell(
+        row=2,
+        column=headers["dataDescoberta"],
+        value="=DATE(2025,6,30)",
+    )
+    target.number_format = "dd/mm/yyyy"
+    coordinate = target.coordinate
+    workbook.save(excel_path)
+    workbook.close()
+    inject_cached_formula_result(
+        excel_path,
+        coordinate=coordinate,
+        cached_value=str(to_excel(date(2025, 6, 30))),
+    )
+
+    result = read_and_normalize_base(
+        read_excel(excel_path),
+        profile_for("2026-06"),
+    )
+
+    assert result.rows[0].get_value("dataDescoberta") == date(
+        2025,
+        6,
+        30,
+    )
+
+
+def test_formula_is_prohibited_in_identifier_even_with_cache(
+    tmp_path: Path,
+) -> None:
+    excel_path = tmp_path / "formula_identificador.xlsx"
+    create_workbook(excel_path, rows=[valid_row_values()])
+    workbook = load_workbook(excel_path)
+    target = workbook["Base"]["B2"]
+    assert target.value == "EVT0001"
+    target.value = '=CONCAT("EVT","0001")'
+    workbook.save(excel_path)
+    workbook.close()
+    inject_cached_formula_result(
+        excel_path,
+        coordinate="B2",
+        cached_value="EVT0001",
+        cell_type="str",
+    )
+
+    result = read_and_normalize_base(
+        read_excel(excel_path),
+        profile_for("2026-06"),
+    )
+
+    assert any(
+        issue.code == "BASE-NORM-FORMULA-ID-001"
+        for issue in result.blocking_issues
+    )
+
+
+def test_formula_with_invalid_cached_result_is_rejected(
+    tmp_path: Path,
+) -> None:
+    excel_path = tmp_path / "formula_resultado_invalido.xlsx"
+    create_workbook(excel_path, rows=[valid_row_values()])
+    workbook = load_workbook(excel_path)
+    headers = {
+        cell.value: cell.column for cell in workbook["Base"][1]
+    }
+    target = workbook["Base"].cell(
+        row=2,
+        column=headers["valorPerdaEfetiva"],
+        value='="ABC"',
+    )
+    coordinate = target.coordinate
+    workbook.save(excel_path)
+    workbook.close()
+    inject_cached_formula_result(
+        excel_path,
+        coordinate=coordinate,
+        cached_value="ABC",
+        cell_type="str",
+    )
+
+    result = read_and_normalize_base(
+        read_excel(excel_path),
+        profile_for("2026-06"),
+    )
+
+    issue = next(
+        issue for issue in result.blocking_issues
+        if issue.column_name == "valorPerdaEfetiva"
+    )
+    assert issue.code == "DEC-FMT-001"
+    assert issue.original_value == '="ABC"'
+    assert issue.normalized_value == "ABC"
+
+
+def test_non_trivial_money_formats_create_audit_warnings(
+    tmp_path: Path,
+) -> None:
+    values = valid_row_values()
+    values["valorPerdaEfetiva"] = "R$ 1.427,98"
+    values["valorRecuperacao"] = "(100,00)"
+    excel_path = tmp_path / "formatos_monetarios.xlsx"
+    create_workbook(excel_path, rows=[values])
+
+    result = read_and_normalize_base(
+        read_excel(excel_path),
+        profile_for("2026-06"),
+    )
+    row = result.rows[0]
+
+    assert row.get_value("valorPerdaEfetiva") == Decimal("1427.98")
+    assert row.get_value("valorRecuperacao") == Decimal("-100.00")
+    assert {
+        issue.rule_code for issue in result.issues
+        if issue.code == "BASE-NORM-MONETARIO-AVISO-001"
+    } == {
+        "REMOCAO_SIMBOLO_BRL",
+        "CONVERSAO_PARENTESES_CONTABEIS",
+    }
 
 
 def test_cosif_length_depends_on_profile(
@@ -373,8 +604,10 @@ def test_cosif_length_depends_on_profile(
 
 
 def test_sample_workbook_normalizes_all_30_rows() -> None:
-    sample_path = Path(
-        "/mnt/data/DRO_5050_planilha_testes(1).xlsx"
+    sample_path = (
+        Path(__file__).parent
+        / "fixtures"
+        / "DRO_5050_planilha_testes.xlsx"
     )
 
     result = read_and_normalize_base(

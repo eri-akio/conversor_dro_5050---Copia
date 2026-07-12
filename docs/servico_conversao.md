@@ -55,6 +55,11 @@ status final
 relatório XLSX
 ```
 
+Entre a validação dos eventos e as etapas financeiras, o serviço executa
+`RECONCILIAÇÃO DE REGRAS ADIADAS`. Essa etapa liga decisões provisórias por
+linha aos resultados definitivos por evento usando código da regra e
+`idEvento`.
+
 ## 3. Entrada do serviço
 
 A solicitação é representada por:
@@ -119,6 +124,20 @@ NÃO APTO PARA ENVIO
 FALHA TÉCNICA
 ```
 
+A decisão também expõe separadamente:
+
+```text
+status_local     = APROVADO | REPROVADO | FALHA_TECNICA
+status_xsd       = APROVADO | REPROVADO | NAO_EXECUTADO
+status_externo   = APROVADO | REPROVADO | NAO_EXECUTADO | NAO_APLICAVEL
+status_historico = APROVADO | REPROVADO | NAO_EXECUTADO | NAO_APLICAVEL
+status_final     = APTO_PARA_ENVIO | NAO_APTO_PARA_ENVIO | FALHA_TECNICA
+```
+
+As regras `EXTERNA` do pré-processamento alimentam `status_externo`. As
+regras `HISTÓRICO DA DATA-BASE ANTERIOR` do pós-processamento alimentam
+`status_historico`. As demais validações permanecem no status local.
+
 ### APTO PARA ENVIO
 
 Exige simultaneamente:
@@ -134,8 +153,13 @@ pós-processamento totalmente verificado
 documento construído
 XML gerado como candidato
 XML válido no XSD selecionado
-nenhuma regra não executada
+status externo aprovado ou não aplicável
+status histórico aprovado ou não aplicável
 ```
+
+Uma validação externa ou histórica não executada nunca é considerada
+aprovada. Mesmo com status local e XSD aprovados, ela mantém o documento
+como `NÃO APTO PARA ENVIO` e aparece separadamente na mensagem final.
 
 ### NÃO APTO PARA ENVIO
 
