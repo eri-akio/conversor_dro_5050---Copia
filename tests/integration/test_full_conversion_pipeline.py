@@ -49,8 +49,8 @@ def test_complete_pipeline_keeps_status_scopes_and_only_two_artifacts(
     assert result.status == FinalExecutionStatus.NOT_APT
     assert result.status_local == LocalValidationStatus.REPROVED
     assert result.status_xsd == XsdValidationSummaryStatus.APPROVED
-    assert result.status_externo == ExternalValidationStatus.NOT_EXECUTED
-    assert result.status_historico == HistoricalValidationStatus.NOT_EXECUTED
+    assert result.status_externo == ExternalValidationStatus.PENDING
+    assert result.status_historico == HistoricalValidationStatus.PENDING
     assert not result.has_technical_failure
     assert result.artifacts.xml_path is not None
     assert result.artifacts.xlsx_path is not None
@@ -66,7 +66,7 @@ def test_complete_pipeline_keeps_status_scopes_and_only_two_artifacts(
     assert "Etapa" in terminal
     assert "Situação" in terminal
     assert "Mensagem" in terminal
-    assert "Status final" in terminal
+    assert "Aptidão para envio" in terminal
     assert terminal.count("LEITURA DO EXCEL") == 1
 
 

@@ -10,9 +10,11 @@ from types import MappingProxyType
 from typing import Any, Mapping
 
 from src.domain.reporting import (
+    DependentValidationStatus,
     ExternalValidationStatus,
     FinalExecutionStatus,
     FinalValidationStatus,
+    GeneralValidationStatus,
     HistoricalValidationStatus,
     LocalValidationStatus,
     ReportArtifacts,
@@ -127,6 +129,8 @@ class FinalStatusDecision:
     status_xsd: XsdValidationSummaryStatus
     status_externo: ExternalValidationStatus
     status_historico: HistoricalValidationStatus
+    status_dependencias: DependentValidationStatus
+    general_status: GeneralValidationStatus
     message: str
     reasons: tuple[FinalStatusReason, ...]
 
@@ -230,6 +234,14 @@ class ConversionResult:
     @property
     def status_historico(self) -> HistoricalValidationStatus:
         return self.decision.status_historico
+
+    @property
+    def status_dependencias(self) -> DependentValidationStatus:
+        return self.decision.status_dependencias
+
+    @property
+    def general_status(self) -> GeneralValidationStatus:
+        return self.decision.general_status
 
     @property
     def status_final(self) -> FinalValidationStatus:

@@ -47,11 +47,14 @@ from src.domain.regulatory_version import (
     RegulatoryVersion,
 )
 from src.domain.reporting import (
+    DependentValidationStatus,
     ExternalValidationStatus,
     ExecutionReportData,
     FinalExecutionStatus,
+    GeneralValidationStatus,
     HistoricalValidationStatus,
     LocalValidationStatus,
+    ReportOccurrenceStatus,
     ReportRecord,
     ReportRuleSummary,
     XsdValidationSummaryStatus,
@@ -183,15 +186,21 @@ class ExecutionReportCollector:
                 if xsd_result.is_valid
                 else XsdValidationSummaryStatus.REPROVED
             )
-            status_externo = ExternalValidationStatus.NOT_APPLICABLE
-            status_historico = (
-                HistoricalValidationStatus.NOT_APPLICABLE
+            status_externo = ExternalValidationStatus.APPROVED
+            status_historico = HistoricalValidationStatus.APPROVED
+            status_dependencias = DependentValidationStatus.APPROVED
+            general_status = (
+                GeneralValidationStatus.APPROVED
+                if final_status == FinalExecutionStatus.APT
+                else GeneralValidationStatus.REPROVED
             )
         else:
             status_local = status_decision.status_local
             status_xsd = status_decision.status_xsd
             status_externo = status_decision.status_externo
             status_historico = status_decision.status_historico
+            status_dependencias = status_decision.status_dependencias
+            general_status = status_decision.general_status
 
         records: list[ReportRecord] = []
         common = {
@@ -383,6 +392,8 @@ class ExecutionReportCollector:
             status_xsd=status_xsd,
             status_externo=status_externo,
             status_historico=status_historico,
+            status_dependencias=status_dependencias,
+            general_status=general_status,
             final_status=final_status,
             final_message=final_message,
             records=tuple(records),
@@ -476,6 +487,8 @@ class ExecutionReportCollector:
             status_xsd=status_decision.status_xsd,
             status_externo=status_decision.status_externo,
             status_historico=status_decision.status_historico,
+            status_dependencias=status_decision.status_dependencias,
+            general_status=status_decision.general_status,
             final_status=status_decision.status,
             final_message=status_decision.message,
             records=records,
@@ -1028,7 +1041,15 @@ class ExecutionReportCollector:
                 ),
                 source=reason.source,
                 severity=reason.severity,
-                status=decision.status.value,
+                status=(
+                    ReportOccurrenceStatus.PENDING.value
+                    if reason.severity == "REGRA NÃO EXECUTADA"
+                    else (
+                        ReportOccurrenceStatus.REPROVED.value
+                        if reason.blocks_apt
+                        else ReportOccurrenceStatus.APPROVED.value
+                    )
+                ),
                 suggestion=None,
                 message=reason.message,
                 dependency=None,

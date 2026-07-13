@@ -43,10 +43,10 @@ def test_complete_service_returns_single_result(
         XsdValidationSummaryStatus.REPROVED
     )
     assert result.status_externo == (
-        ExternalValidationStatus.NOT_EXECUTED
+        ExternalValidationStatus.PENDING
     )
     assert result.status_historico == (
-        HistoricalValidationStatus.NOT_EXECUTED
+        HistoricalValidationStatus.PENDING
     )
     assert result.status_final == (
         FinalValidationStatus.NOT_APT_FOR_SUBMISSION

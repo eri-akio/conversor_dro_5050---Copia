@@ -11,7 +11,7 @@ from typing import Mapping
 
 
 class FinalExecutionStatus(StrEnum):
-    """Classificação final consolidada da execução."""
+    """Aptidão regulatória do documento para envio."""
 
     APT = "APTO PARA ENVIO"
     NOT_APT = "NÃO APTO PARA ENVIO"
@@ -44,7 +44,6 @@ class LocalValidationStatus(StrEnum):
 
     APPROVED = "APROVADO"
     REPROVED = "REPROVADO"
-    TECHNICAL_FAILURE = "FALHA_TECNICA"
 
 
 class XsdValidationSummaryStatus(StrEnum):
@@ -59,18 +58,41 @@ class ExternalValidationStatus(StrEnum):
     """Resultado das regras dependentes de bases externas."""
 
     APPROVED = "APROVADO"
+    PENDING = "PENDENTE"
     REPROVED = "REPROVADO"
-    NOT_EXECUTED = "NAO_EXECUTADO"
-    NOT_APPLICABLE = "NAO_APLICAVEL"
 
 
 class HistoricalValidationStatus(StrEnum):
     """Resultado das regras dependentes de remessa anterior."""
 
     APPROVED = "APROVADO"
+    PENDING = "PENDENTE"
     REPROVED = "REPROVADO"
-    NOT_EXECUTED = "NAO_EXECUTADO"
-    NOT_APPLICABLE = "NAO_APLICAVEL"
+
+
+class DependentValidationStatus(StrEnum):
+    """Consolida validações externas e históricas."""
+
+    APPROVED = "APROVADO"
+    PENDING = "PENDENTE"
+    REPROVED = "REPROVADO"
+
+
+class GeneralValidationStatus(StrEnum):
+    """Resultado geral anterior à decisão de aptidão para envio."""
+
+    APPROVED = "APROVADO"
+    PENDING = "PENDENTE"
+    REPROVED = "REPROVADO"
+    TECHNICAL_FAILURE = "FALHA TÉCNICA"
+
+
+class ReportOccurrenceStatus(StrEnum):
+    """Resultado de execução usado em ocorrências sintéticas."""
+
+    APPROVED = "APROVADA"
+    REPROVED = "REPROVADA"
+    PENDING = "PENDENTE"
 
 
 @dataclass(frozen=True, slots=True)
@@ -139,6 +161,8 @@ class ExecutionReportData:
     status_xsd: XsdValidationSummaryStatus
     status_externo: ExternalValidationStatus
     status_historico: HistoricalValidationStatus
+    status_dependencias: DependentValidationStatus
+    general_status: GeneralValidationStatus
     final_status: FinalExecutionStatus
     final_message: str
     records: tuple[ReportRecord, ...]

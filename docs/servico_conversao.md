@@ -153,13 +153,13 @@ pós-processamento totalmente verificado
 documento construído
 XML gerado como candidato
 XML válido no XSD selecionado
-status externo aprovado ou não aplicável
-status histórico aprovado ou não aplicável
+validações externas ou históricas consolidadas como aprovadas
+resultado geral aprovado
 ```
 
-Uma validação externa ou histórica não executada nunca é considerada
-aprovada. Mesmo com status local e XSD aprovados, ela mantém o documento
-como `NÃO APTO PARA ENVIO` e aparece separadamente na mensagem final.
+Uma validação externa ou histórica não executada produz `PENDENTE`. Mesmo
+com status local e XSD aprovados, o resultado geral permanece `PENDENTE` e a
+aptidão fica `NÃO APTO PARA ENVIO`.
 
 ### NÃO APTO PARA ENVIO
 

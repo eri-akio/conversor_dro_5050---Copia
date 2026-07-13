@@ -38,6 +38,7 @@ OCCURRENCE_HEADERS = (
     "Regra",
     "Descrição da Regra",
     "Origem",
+    "Gravidade",
     "Status",
     "Mensagem",
 )
@@ -100,13 +101,17 @@ class XlsxReportWriter:
                 cell.fill = _fill(TITLE_FILL)
 
         metadata = (
-            ("Resultado final", data.final_status.value),
             ("Status local", data.status_local.value),
             ("Status XSD", data.status_xsd.value),
-            ("Status externo", data.status_externo.value),
-            ("Status histórico", data.status_historico.value),
-            ("Mensagem final", data.final_message),
+            (
+                "Validações externas ou históricas",
+                data.status_dependencias.value,
+            ),
+            ("Resultado geral", data.general_status.value),
+            ("Aptidão para envio", data.final_status.value),
         )
+
+        self._section_title(sheet, "A3:B3", "Resultado da validação")
 
         bottom_side = Side(
             style="thin",
@@ -119,7 +124,7 @@ class XlsxReportWriter:
             label_cell.border = Border(bottom=bottom_side)
             sheet.cell(row=row_index, column=2, value=value)
 
-        status_row = 4
+        status_row = 8
         sheet.cell(row=status_row, column=2).fill = _fill(
             STATUS_FILLS[data.final_status]
         )
@@ -138,35 +143,22 @@ class XlsxReportWriter:
         metric_end = max(metric_start, metric_start + len(data.metrics) - 1)
 
         self._section_title(sheet, "G3:H3", "CONTAGEM DAS OCORRÊNCIAS")
-        occurrence_end_row = max(2, len(data.records) + 1)
         labels_and_formulas = (
             (
                 "ERRO IMPEDITIVO",
-                (
-                    "=COUNTIF('Ocorrencias'!$J$2:"
-                    f'$J${occurrence_end_row},"ERRO IMPEDITIVO")'
-                ),
+                data.severity_counts.get("ERRO IMPEDITIVO", 0),
             ),
             (
                 "ERRO",
-                (
-                    "=COUNTIF('Ocorrencias'!$J$2:"
-                    f'$J${occurrence_end_row},"ERRO")'
-                ),
+                data.severity_counts.get("ERRO", 0),
             ),
             (
                 "AVISO",
-                (
-                    "=COUNTIF('Ocorrencias'!$J$2:"
-                    f'$J${occurrence_end_row},"AVISO")'
-                ),
+                data.severity_counts.get("AVISO", 0),
             ),
             (
                 "INFORMAÇÃO",
-                (
-                    "=COUNTIF('Ocorrencias'!$J$2:"
-                    f'$J${occurrence_end_row},"INFORMAÇÃO")'
-                ),
+                data.severity_counts.get("INFORMAÇÃO", 0),
             ),
             (
                 "REGRA NÃO EXECUTADA",
@@ -194,7 +186,8 @@ class XlsxReportWriter:
             sheet.cell(row=row_index, column=8, value=formula)
         count_end = count_start + len(labels_and_formulas) - 1
 
-        content_end = max(metric_end, count_end, 5)
+        metadata_end = 3 + len(metadata)
+        content_end = max(metric_end, count_end, metadata_end, 5)
         for row in sheet.iter_rows(
             min_row=4,
             max_row=content_end,
@@ -208,28 +201,6 @@ class XlsxReportWriter:
         for column_index, width in enumerate(widths, start=1):
             sheet.column_dimensions[get_column_letter(column_index)].width = width
         sheet.freeze_panes = "A3"
-
-        note_row = content_end + 2
-        sheet.merge_cells(
-            start_row=note_row,
-            start_column=1,
-            end_row=note_row,
-            end_column=8,
-        )
-        note = sheet.cell(
-            row=note_row,
-            column=1,
-            value=(
-                "O resultado APTO exige XML válido no XSD, ausência de "
-                "erros impeditivos locais e nenhuma regra regulatória pendente."
-            ),
-        )
-        note.fill = _fill("FFF2CC")
-        note.font = Font(italic=True)
-        note.alignment = Alignment(wrap_text=True)
-        for cell in sheet[note_row]:
-            if cell.column <= 8:
-                cell.fill = _fill("FFF2CC")
 
     @staticmethod
     def _section_title(sheet, cell_range: str, value: str) -> None:
@@ -264,6 +235,7 @@ class XlsxReportWriter:
                     record.rule_description,
                     record.source,
                     record.severity,
+                    record.status,
                     record.message,
                 )
             )
@@ -314,7 +286,8 @@ class XlsxReportWriter:
             "H": 42,
             "I": 30,
             "J": 22,
-            "K": 48,
+            "K": 22,
+            "L": 48,
         }
         for column, width in widths.items():
             sheet.column_dimensions[column].width = width
@@ -327,6 +300,23 @@ class XlsxReportWriter:
                     formula=['$J2="ERRO IMPEDITIVO"'],
                     fill=_fill("F4CCCC"),
                     font=Font(bold=True, color="9C0006"),
+                ),
+            )
+            status_range = f"K2:K{end_row}"
+            sheet.conditional_formatting.add(
+                status_range,
+                FormulaRule(
+                    formula=['$K2="REPROVADA"'],
+                    fill=_fill("F4CCCC"),
+                    font=Font(bold=True, color="9C0006"),
+                ),
+            )
+            sheet.conditional_formatting.add(
+                status_range,
+                FormulaRule(
+                    formula=['$K2="REGRA NÃO EXECUTADA"'],
+                    fill=_fill("E4DFEC"),
+                    font=Font(color="5F497A"),
                 ),
             )
             sheet.conditional_formatting.add(

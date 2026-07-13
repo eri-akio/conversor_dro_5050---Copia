@@ -104,7 +104,7 @@ def print_execution_steps(
             print(line, file=output)
 
     for line in _row_lines(
-        "Status final",
+        "Aptidão para envio",
         final_status,
         final_message,
     ):
@@ -145,14 +145,12 @@ def print_conversion_summary(
     print(f"Status local: {result.status_local.value}", file=output)
     print(f"Validação XSD: {result.status_xsd.value}", file=output)
     print(
-        f"Validações externas: {result.status_externo.value}",
+        "Status das validações externas ou históricas: "
+        f"{result.status_dependencias.value}",
         file=output,
     )
-    print(
-        f"Validações históricas: {result.status_historico.value}",
-        file=output,
-    )
-    print(f"Status final: {result.status.value}", file=output)
+    print(f"Resultado geral: {result.general_status.value}", file=output)
+    print(f"Aptidão para envio: {result.status.value}", file=output)
     print(file=output)
     print(result.final_message, file=output)
 
@@ -211,7 +209,7 @@ def print_execution_failure(
     for line in _row_lines(stage, "FALHA TÉCNICA", message):
         print(line, file=output)
     for line in _row_lines(
-        "Status final",
+        "Aptidão para envio",
         "FALHA TÉCNICA",
         "Conversão interrompida.",
     ):

@@ -10,9 +10,11 @@ from pathlib import Path
 from openpyxl import load_workbook
 
 from src.domain.reporting import (
+    DependentValidationStatus,
     ExternalValidationStatus,
     ExecutionReportData,
     FinalExecutionStatus,
+    GeneralValidationStatus,
     HistoricalValidationStatus,
     LocalValidationStatus,
     ReportRecord,
@@ -25,13 +27,22 @@ from src.reporters.xlsx_reporter import (
 
 
 REMOVED_SUMMARY_LABELS = {
+    "Duração (segundos)",
     "Execução",
+    "Arquivo de entrada",
+    "dataBase",
+    "Arquivo XML",
     "Início",
     "Fim",
-    "Duração (segundos)",
-    "dataBase",
     "Perfil",
+    "XSD selecionado",
+    "Mensagem final",
 }
+
+REMOVED_SUMMARY_NOTE = (
+    "O resultado APTO exige XML válido no XSD, ausência de erros impeditivos "
+    "locais e nenhuma regra regulatória pendente."
+)
 
 REMOVED_OCCURRENCE_HEADERS = {
     "Execução",
@@ -42,7 +53,6 @@ REMOVED_OCCURRENCE_HEADERS = {
     "Dependência",
     "Resultado Final",
     "Versão",
-    "Gravidade",
     "Sugestão",
     "Escopo",
     "Resultado Definitivo",
@@ -58,6 +68,7 @@ EXPECTED_OCCURRENCE_HEADERS = (
     "Regra",
     "Descrição da Regra",
     "Origem",
+    "Gravidade",
     "Status",
     "Mensagem",
 )
@@ -99,10 +110,12 @@ class SimplifiedXlsxReporterTests(unittest.TestCase):
             profile_code="DRO_2025_06",
             status_local=LocalValidationStatus.APPROVED,
             status_xsd=XsdValidationSummaryStatus.APPROVED,
-            status_externo=ExternalValidationStatus.NOT_EXECUTED,
+            status_externo=ExternalValidationStatus.PENDING,
             status_historico=(
-                HistoricalValidationStatus.NOT_EXECUTED
+                HistoricalValidationStatus.PENDING
             ),
+            status_dependencias=DependentValidationStatus.PENDING,
+            general_status=GeneralValidationStatus.PENDING,
             final_status=FinalExecutionStatus.NOT_APT,
             final_message="Há pendências",
             records=(record,),
@@ -126,17 +139,28 @@ class SimplifiedXlsxReporterTests(unittest.TestCase):
             if isinstance(cell.value, str)
         }
         self.assertTrue(REMOVED_SUMMARY_LABELS.isdisjoint(summary_values))
-        self.assertEqual(summary["A4"].value, "Resultado final")
-        self.assertEqual(summary["A5"].value, "Status local")
+        self.assertNotIn(REMOVED_SUMMARY_NOTE, summary_values)
+        self.assertNotIn("Há pendências", summary_values)
+        self.assertEqual(summary["A3"].value, "Resultado da validação")
+        self.assertIn("A3:B3", {str(item) for item in summary.merged_cells.ranges})
+        self.assertEqual(summary["A3"]._style, summary["D3"]._style)
+        self.assertEqual(summary["A4"].value, "Status local")
+        self.assertEqual(summary["B4"].value, "APROVADO")
+        self.assertEqual(summary["A5"].value, "Status XSD")
         self.assertEqual(summary["B5"].value, "APROVADO")
-        self.assertEqual(summary["A6"].value, "Status XSD")
-        self.assertEqual(summary["B6"].value, "APROVADO")
-        self.assertEqual(summary["A7"].value, "Status externo")
-        self.assertEqual(summary["B7"].value, "NAO_EXECUTADO")
-        self.assertEqual(summary["A8"].value, "Status histórico")
-        self.assertEqual(summary["B8"].value, "NAO_EXECUTADO")
-        self.assertEqual(summary["A9"].value, "Mensagem final")
-        self.assertIn("$J$2:$J$2", summary["H4"].value)
+        self.assertEqual(
+            summary["A6"].value,
+            "Validações externas ou históricas",
+        )
+        self.assertEqual(summary["B6"].value, "PENDENTE")
+        self.assertEqual(summary["A7"].value, "Resultado geral")
+        self.assertEqual(summary["B7"].value, "PENDENTE")
+        self.assertEqual(summary["A8"].value, "Aptidão para envio")
+        self.assertEqual(summary["B8"].value, "NÃO APTO PARA ENVIO")
+        self.assertIsNone(summary["A9"].value)
+        self.assertIsNone(summary["B9"].value)
+        self.assertEqual(summary["H4"].value, 1)
+        self.assertIsInstance(summary["H4"].value, int)
         self.assertEqual(summary["H8"].value, 0)
         self.assertEqual(summary["H9"].value, 1)
 
@@ -144,13 +168,14 @@ class SimplifiedXlsxReporterTests(unittest.TestCase):
         headers = tuple(cell.value for cell in occurrences[1])
         self.assertEqual(headers, OCCURRENCE_HEADERS)
         self.assertEqual(headers, EXPECTED_OCCURRENCE_HEADERS)
-        self.assertEqual(len(headers), 11)
+        self.assertEqual(len(headers), 12)
         self.assertTrue(REMOVED_OCCURRENCE_HEADERS.isdisjoint(headers))
         self.assertEqual(occurrences["A2"].value, "VALIDAÇÃO")
         self.assertEqual(occurrences["J2"].value, "ERRO IMPEDITIVO")
-        self.assertEqual(occurrences["K2"].value, "Valor inválido")
+        self.assertEqual(occurrences["K2"].value, "REPROVADA")
+        self.assertEqual(occurrences["L2"].value, "Valor inválido")
         self.assertEqual(occurrences.freeze_panes, "A2")
-        self.assertEqual(occurrences.tables["OccurrencesTable"].ref, "A1:K2")
+        self.assertEqual(occurrences.tables["OccurrencesTable"].ref, "A1:L2")
 
 
 if __name__ == "__main__":

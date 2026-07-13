@@ -43,6 +43,8 @@ def _result(*records: ConversionStageRecord):
         status_xsd=SimpleNamespace(value="APROVADO"),
         status_externo=SimpleNamespace(value="NAO_EXECUTADO"),
         status_historico=SimpleNamespace(value="NAO_EXECUTADO"),
+        status_dependencias=SimpleNamespace(value="PENDENTE"),
+        general_status=SimpleNamespace(value="PENDENTE"),
         has_technical_failure=False,
         final_message="Aptidão completa não comprovada.",
     )
@@ -58,7 +60,7 @@ def test_terminal_prints_execution_steps(capsys) -> None:
     assert "Mensagem" in output
     assert ConversionStage.READ_EXCEL.value in output
     assert "Arquivo lido com sucesso." in output
-    assert "Status final" in output
+    assert "Aptidão para envio" in output
 
 
 def test_terminal_does_not_print_legacy_blocks(capsys) -> None:
@@ -118,9 +120,9 @@ def test_gui_conversion_summary_is_printed_without_artifact_paths(
         "\n"
         "Status local: APROVADO\n"
         "Validação XSD: APROVADO\n"
-        "Validações externas: NAO_EXECUTADO\n"
-        "Validações históricas: NAO_EXECUTADO\n"
-        "Status final: NÃO APTO PARA ENVIO\n"
+        "Status das validações externas ou históricas: PENDENTE\n"
+        "Resultado geral: PENDENTE\n"
+        "Aptidão para envio: NÃO APTO PARA ENVIO\n"
         "\n"
         "Aptidão completa não comprovada.\n"
     )
@@ -159,7 +161,7 @@ def test_gui_terminal_keeps_execution_steps_and_summary(capsys) -> None:
     )
     assert output.startswith(expected_header)
     assert output.count(ConversionStage.READ_EXCEL.value) == 1
-    assert "Status final" in output
+    assert "Aptidão para envio" in output
     assert "Conversão concluída." in output
     assert "Status local: APROVADO" in output
     assert "Aptidão completa não comprovada." in output

@@ -230,7 +230,7 @@ def test_xlsx_contains_required_sheets_and_columns(
     headers = tuple(
         cell.value for cell in occurrences[1]
     )
-    assert len(headers) == 11
+    assert len(headers) == 12
 
     assert headers == (
         "Etapa",
@@ -242,6 +242,7 @@ def test_xlsx_contains_required_sheets_and_columns(
         "Regra",
         "Descrição da Regra",
         "Origem",
+        "Gravidade",
         "Status",
         "Mensagem",
     )
@@ -255,7 +256,6 @@ def test_xlsx_contains_required_sheets_and_columns(
         "Dependência",
         "Resultado Final",
         "Versão",
-        "Gravidade",
         "Sugestão",
         "Escopo",
         "Resultado Definitivo",
@@ -269,14 +269,28 @@ def test_xlsx_contains_required_sheets_and_columns(
         if isinstance(cell.value, str)
     }
     for removed_label in (
+        "Duração (segundos)",
         "Execução",
+        "Arquivo de entrada",
+        "dataBase",
+        "Arquivo XML",
         "Início",
         "Fim",
-        "Duração (segundos)",
-        "dataBase",
         "Perfil",
+        "XSD selecionado",
+        "Mensagem final",
+        (
+            "O resultado APTO exige XML válido no XSD, ausência de erros "
+            "impeditivos locais e nenhuma regra regulatória pendente."
+        ),
     ):
         assert removed_label not in summary_values
+
+    summary = workbook["Resumo"]
+    assert summary["A3"].value == "Resultado da validação"
+    assert "A3:B3" in {str(item) for item in summary.merged_cells.ranges}
+    assert summary["A3"]._style == summary["D3"]._style
+    assert data.final_message not in summary_values
 
 
 def test_report_files_are_not_overwritten(

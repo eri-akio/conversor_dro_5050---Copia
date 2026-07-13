@@ -9,8 +9,10 @@ from src.domain.conversion import (
     ConversionStage,
 )
 from src.domain.reporting import (
+    DependentValidationStatus,
     ExternalValidationStatus,
     FinalExecutionStatus,
+    GeneralValidationStatus,
     HistoricalValidationStatus,
     LocalValidationStatus,
     XsdValidationSummaryStatus,
@@ -41,6 +43,7 @@ def valid_context() -> dict[str, object]:
         "reconciliation": SimpleNamespace(
             is_fully_reconciled=True,
             unresolved_records=(),
+            failed_records=(),
             blocks_apt=False,
         ),
         "financial_validation": SimpleNamespace(
@@ -95,6 +98,29 @@ def regulatory_rule(
     )
 
 
+def test_consolidated_status_domains_match_the_decision_matrix() -> None:
+    assert {status.value for status in LocalValidationStatus} == {
+        "APROVADO",
+        "REPROVADO",
+    }
+    expected_dependencies = {"APROVADO", "PENDENTE", "REPROVADO"}
+    assert {status.value for status in ExternalValidationStatus} == (
+        expected_dependencies
+    )
+    assert {status.value for status in HistoricalValidationStatus} == (
+        expected_dependencies
+    )
+    assert {status.value for status in DependentValidationStatus} == (
+        expected_dependencies
+    )
+    assert {status.value for status in GeneralValidationStatus} == {
+        "APROVADO",
+        "PENDENTE",
+        "REPROVADO",
+        "FALHA TÉCNICA",
+    }
+
+
 def test_complete_valid_context_is_apt() -> None:
     decision = FinalStatusService().evaluate_complete(
         **valid_context()
@@ -106,11 +132,13 @@ def test_complete_valid_context_is_apt() -> None:
         XsdValidationSummaryStatus.APPROVED
     )
     assert decision.status_externo == (
-        ExternalValidationStatus.NOT_APPLICABLE
+        ExternalValidationStatus.APPROVED
     )
     assert decision.status_historico == (
-        HistoricalValidationStatus.NOT_APPLICABLE
+        HistoricalValidationStatus.APPROVED
     )
+    assert decision.status_dependencias == DependentValidationStatus.APPROVED
+    assert decision.general_status == GeneralValidationStatus.APPROVED
     assert decision.is_apt
     assert not decision.blocking_reasons
 
@@ -139,6 +167,7 @@ def test_pending_and_invalid_rules_are_not_apt() -> None:
     )
 
     assert decision.status == FinalExecutionStatus.NOT_APT
+    assert decision.status_local == LocalValidationStatus.REPROVED
     assert {
         reason.code
         for reason in decision.blocking_reasons
@@ -161,18 +190,47 @@ def test_local_blocking_error_reproves_local_status() -> None:
     assert decision.status == FinalExecutionStatus.NOT_APT
 
 
-def test_unresolved_deferred_rule_reproves_local_status() -> None:
+def test_proven_error_has_precedence_over_external_pending() -> None:
     context = valid_context()
-    pending = SimpleNamespace(rule_code="DRO001312")
-    context["reconciliation"] = SimpleNamespace(
-        is_fully_reconciled=False,
-        unresolved_records=(pending,),
-        blocks_apt=True,
+    context["row_validation"] = SimpleNamespace(
+        is_locally_valid=False,
+        is_fully_verified=False,
+    )
+    external_rule = regulatory_rule(
+        "DRO001401",
+        "REGRA NÃO EXECUTADA",
+        "EXTERNA",
+    )
+    context["pre_processing"] = SimpleNamespace(
+        is_locally_valid=True,
+        not_executed_rules=(external_rule,),
+        rule_results=(external_rule,),
     )
 
     decision = FinalStatusService().evaluate_complete(**context)
 
     assert decision.status_local == LocalValidationStatus.REPROVED
+    assert decision.status_externo == ExternalValidationStatus.PENDING
+    assert decision.status_dependencias == DependentValidationStatus.PENDING
+    assert decision.general_status == GeneralValidationStatus.REPROVED
+    assert decision.status == FinalExecutionStatus.NOT_APT
+
+
+def test_unresolved_deferred_rule_leaves_dependencies_pending() -> None:
+    context = valid_context()
+    pending = SimpleNamespace(rule_code="DRO001312")
+    context["reconciliation"] = SimpleNamespace(
+        is_fully_reconciled=False,
+        unresolved_records=(pending,),
+        failed_records=(),
+        blocks_apt=True,
+    )
+
+    decision = FinalStatusService().evaluate_complete(**context)
+
+    assert decision.status_local == LocalValidationStatus.APPROVED
+    assert decision.status_dependencias == DependentValidationStatus.PENDING
+    assert decision.general_status == GeneralValidationStatus.PENDING
     assert decision.status == FinalExecutionStatus.NOT_APT
     assert any(
         reason.code == "STATUS-RECON-NE-001"
@@ -180,7 +238,7 @@ def test_unresolved_deferred_rule_reproves_local_status() -> None:
     )
 
 
-def test_external_rule_not_executed_is_not_local_error() -> None:
+def test_external_rule_not_executed_leaves_local_approved() -> None:
     context = valid_context()
     external_rule = regulatory_rule(
         "DRO001401",
@@ -197,10 +255,34 @@ def test_external_rule_not_executed_is_not_local_error() -> None:
 
     assert decision.status_local == LocalValidationStatus.APPROVED
     assert decision.status_externo == (
-        ExternalValidationStatus.NOT_EXECUTED
+        ExternalValidationStatus.PENDING
     )
+    assert decision.status_dependencias == DependentValidationStatus.PENDING
+    assert decision.general_status == GeneralValidationStatus.PENDING
     assert decision.status == FinalExecutionStatus.NOT_APT
-    assert "Validações externas: NAO_EXECUTADO" in decision.message
+    assert "Validações externas ou históricas: PENDENTE" in decision.message
+
+
+def test_external_reproof_reproves_general_result_not_local_data() -> None:
+    context = valid_context()
+    external_rule = regulatory_rule(
+        "DRO001401",
+        "REPROVADA",
+        "EXTERNA",
+    )
+    context["pre_processing"] = SimpleNamespace(
+        is_locally_valid=True,
+        not_executed_rules=(),
+        rule_results=(external_rule,),
+    )
+
+    decision = FinalStatusService().evaluate_complete(**context)
+
+    assert decision.status_local == LocalValidationStatus.APPROVED
+    assert decision.status_externo == ExternalValidationStatus.REPROVED
+    assert decision.status_dependencias == DependentValidationStatus.REPROVED
+    assert decision.general_status == GeneralValidationStatus.REPROVED
+    assert decision.status == FinalExecutionStatus.NOT_APT
 
 
 def test_historical_rule_not_executed_is_separate() -> None:
@@ -221,8 +303,10 @@ def test_historical_rule_not_executed_is_separate() -> None:
 
     assert decision.status_local == LocalValidationStatus.APPROVED
     assert decision.status_historico == (
-        HistoricalValidationStatus.NOT_EXECUTED
+        HistoricalValidationStatus.PENDING
     )
+    assert decision.status_dependencias == DependentValidationStatus.PENDING
+    assert decision.general_status == GeneralValidationStatus.PENDING
     assert decision.status == FinalExecutionStatus.NOT_APT
 
 
@@ -247,6 +331,7 @@ def test_approved_external_and_historical_rules_are_apt() -> None:
     assert decision.status_historico == (
         HistoricalValidationStatus.APPROVED
     )
+    assert decision.general_status == GeneralValidationStatus.APPROVED
     assert decision.status == FinalExecutionStatus.APT
 
 
@@ -268,10 +353,10 @@ def test_not_applicable_dependent_rules_allow_apt() -> None:
     decision = FinalStatusService().evaluate_complete(**context)
 
     assert decision.status_externo == (
-        ExternalValidationStatus.NOT_APPLICABLE
+        ExternalValidationStatus.APPROVED
     )
     assert decision.status_historico == (
-        HistoricalValidationStatus.NOT_APPLICABLE
+        HistoricalValidationStatus.APPROVED
     )
     assert decision.status == FinalExecutionStatus.APT
 
@@ -300,9 +385,8 @@ def test_xsd_technical_failure_has_precedence() -> None:
     assert decision.status == (
         FinalExecutionStatus.TECHNICAL_FAILURE
     )
-    assert decision.status_local == (
-        LocalValidationStatus.TECHNICAL_FAILURE
-    )
+    assert decision.status_local == LocalValidationStatus.REPROVED
+    assert decision.general_status == GeneralValidationStatus.TECHNICAL_FAILURE
     assert decision.status_xsd == (
         XsdValidationSummaryStatus.NOT_EXECUTED
     )
@@ -348,9 +432,8 @@ def test_interrupted_read_is_technical_failure() -> None:
     assert decision.status == (
         FinalExecutionStatus.TECHNICAL_FAILURE
     )
-    assert decision.status_local == (
-        LocalValidationStatus.TECHNICAL_FAILURE
-    )
+    assert decision.status_local == LocalValidationStatus.REPROVED
+    assert decision.general_status == GeneralValidationStatus.TECHNICAL_FAILURE
     assert decision.status_xsd == (
         XsdValidationSummaryStatus.NOT_EXECUTED
     )

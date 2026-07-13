@@ -9,9 +9,11 @@ from pathlib import Path
 
 from src.domain.conversion import ConversionRequest
 from src.domain.reporting import (
+    DependentValidationStatus,
     ExternalValidationStatus,
     ExecutionReportData,
     FinalExecutionStatus,
+    GeneralValidationStatus,
     HistoricalValidationStatus,
     LocalValidationStatus,
     XsdValidationSummaryStatus,
@@ -34,10 +36,12 @@ class OutputArtifactsOnlyTests(unittest.TestCase):
             profile_code="DRO_2025_06",
             status_local=LocalValidationStatus.APPROVED,
             status_xsd=XsdValidationSummaryStatus.APPROVED,
-            status_externo=ExternalValidationStatus.NOT_APPLICABLE,
+            status_externo=ExternalValidationStatus.APPROVED,
             status_historico=(
-                HistoricalValidationStatus.NOT_APPLICABLE
+                HistoricalValidationStatus.APPROVED
             ),
+            status_dependencias=DependentValidationStatus.APPROVED,
+            general_status=GeneralValidationStatus.APPROVED,
             final_status=FinalExecutionStatus.APT,
             final_message="Processamento concluído.",
             records=(),
