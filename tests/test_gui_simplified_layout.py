@@ -3,6 +3,9 @@
 from __future__ import annotations
 
 from pathlib import Path
+from types import SimpleNamespace
+
+from src.gui.app import Dro5050Application
 
 
 APP_PATH = (
@@ -61,6 +64,38 @@ def test_action_buttons_are_centered_in_a_vertical_column() -> None:
     assert "self.convert_button.grid(\n            row=0,\n            column=1," in action_layout
     assert 'self.artifact_buttons["xml"].grid(\n            row=1,\n            column=1,' in action_layout
     assert 'self.artifact_buttons["xlsx"].grid(\n            row=2,\n            column=1,' in action_layout
+
+
+def test_window_is_centered_after_widgets_are_loaded() -> None:
+    source = _source()
+
+    assert "WINDOW_WIDTH = 720" in source
+    assert "WINDOW_HEIGHT = 430" in source
+    assert "self.master.after_idle(self._center_window)" in source
+    assert source.index("self._build_widgets()") < source.index(
+        "self.master.after_idle(self._center_window)"
+    )
+    assert "self.master.update_idletasks()" in source
+    assert "self.master.winfo_screenwidth()" in source
+    assert "self.master.winfo_screenheight()" in source
+    assert "(screen_width - WINDOW_WIDTH) // 2" in source
+    assert "(screen_height - WINDOW_HEIGHT) // 2" in source
+    assert 'f"{WINDOW_WIDTH}x{WINDOW_HEIGHT}"' in source
+
+
+def test_window_centering_preserves_size_and_uses_screen_resolution() -> None:
+    geometries: list[str] = []
+    master = SimpleNamespace(
+        update_idletasks=lambda: None,
+        winfo_screenwidth=lambda: 1920,
+        winfo_screenheight=lambda: 1080,
+        geometry=geometries.append,
+    )
+    application = SimpleNamespace(master=master)
+
+    Dro5050Application._center_window(application)
+
+    assert geometries == ["720x430+600+325"]
 
 
 def test_subtitle_numbered_sections_and_message_area_were_removed() -> None:

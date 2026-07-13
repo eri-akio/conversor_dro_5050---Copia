@@ -31,6 +31,8 @@ STATUS_TECHNICAL_FAILURE = "Falha técnica"
 PATH_ENTRY_WIDTH = 62
 SELECT_BUTTON_WIDTH = 16
 ACTION_BUTTON_WIDTH = 38
+WINDOW_WIDTH = 720
+WINDOW_HEIGHT = 430
 
 
 class Dro5050Application(ttk.Frame):
@@ -61,6 +63,7 @@ class Dro5050Application(ttk.Frame):
         self._configure_styles()
         self._build_widgets()
         self._set_artifact_buttons_state(False)
+        self.master.after_idle(self._center_window)
         self.master.protocol(
             "WM_DELETE_WINDOW",
             self._on_close,
@@ -72,13 +75,34 @@ class Dro5050Application(ttk.Frame):
 
     def _configure_window(self) -> None:
         self.master.title("Smart Reporting")
-        self.master.geometry("720x430")
-        self.master.minsize(720, 430)
+        self.master.geometry(
+            f"{WINDOW_WIDTH}x{WINDOW_HEIGHT}"
+        )
+        self.master.minsize(WINDOW_WIDTH, WINDOW_HEIGHT)
         self.master.columnconfigure(0, weight=1)
         self.master.rowconfigure(0, weight=1)
 
         self.grid(row=0, column=0, sticky="nsew")
         self.columnconfigure(0, weight=1)
+
+    def _center_window(self) -> None:
+        """Centraliza a janela após o carregamento dos componentes."""
+
+        self.master.update_idletasks()
+        screen_width = self.master.winfo_screenwidth()
+        screen_height = self.master.winfo_screenheight()
+        position_x = max(
+            (screen_width - WINDOW_WIDTH) // 2,
+            0,
+        )
+        position_y = max(
+            (screen_height - WINDOW_HEIGHT) // 2,
+            0,
+        )
+        self.master.geometry(
+            f"{WINDOW_WIDTH}x{WINDOW_HEIGHT}"
+            f"+{position_x}+{position_y}"
+        )
 
     def _configure_styles(self) -> None:
         style = ttk.Style(self.master)
