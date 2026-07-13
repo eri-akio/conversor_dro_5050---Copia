@@ -38,7 +38,29 @@ REMOVED_OCCURRENCE_HEADERS = {
     "Data/Hora",
     "Arquivo de Entrada",
     "Arquivo XML",
+    "Aba",
+    "Dependência",
+    "Resultado Final",
+    "Versão",
+    "Gravidade",
+    "Sugestão",
+    "Escopo",
+    "Resultado Definitivo",
 }
+
+EXPECTED_OCCURRENCE_HEADERS = (
+    "Etapa",
+    "Linha",
+    "idEvento",
+    "Coluna",
+    "Valor Original",
+    "Valor Normalizado",
+    "Regra",
+    "Descrição da Regra",
+    "Origem",
+    "Status",
+    "Mensagem",
+)
 
 
 class SimplifiedXlsxReporterTests(unittest.TestCase):
@@ -114,19 +136,21 @@ class SimplifiedXlsxReporterTests(unittest.TestCase):
         self.assertEqual(summary["A8"].value, "Status histórico")
         self.assertEqual(summary["B8"].value, "NAO_EXECUTADO")
         self.assertEqual(summary["A9"].value, "Mensagem final")
-        self.assertIn("$M$2:$M$2", summary["H4"].value)
-        self.assertIn("$N$2:$N$2", summary["H8"].value)
+        self.assertIn("$J$2:$J$2", summary["H4"].value)
+        self.assertEqual(summary["H8"].value, 0)
+        self.assertEqual(summary["H9"].value, 1)
 
         occurrences = workbook["Ocorrencias"]
         headers = tuple(cell.value for cell in occurrences[1])
         self.assertEqual(headers, OCCURRENCE_HEADERS)
-        self.assertEqual(len(headers), 19)
+        self.assertEqual(headers, EXPECTED_OCCURRENCE_HEADERS)
+        self.assertEqual(len(headers), 11)
         self.assertTrue(REMOVED_OCCURRENCE_HEADERS.isdisjoint(headers))
-        self.assertEqual(occurrences["A2"].value, "NÃO APTO PARA ENVIO")
-        self.assertEqual(occurrences["M2"].value, "ERRO IMPEDITIVO")
-        self.assertEqual(occurrences["N2"].value, "REPROVADA")
+        self.assertEqual(occurrences["A2"].value, "VALIDAÇÃO")
+        self.assertEqual(occurrences["J2"].value, "ERRO IMPEDITIVO")
+        self.assertEqual(occurrences["K2"].value, "Valor inválido")
         self.assertEqual(occurrences.freeze_panes, "A2")
-        self.assertEqual(occurrences.tables["OccurrencesTable"].ref, "A1:S2")
+        self.assertEqual(occurrences.tables["OccurrencesTable"].ref, "A1:K2")
 
 
 if __name__ == "__main__":

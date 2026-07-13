@@ -11,28 +11,23 @@ from pathlib import Path
 from typing import Sequence
 
 from src.config import (
-    DOCUMENT_CODE,
     OUTPUT_DIR,
     POST_PROCESSING_CRITICS_PATH,
     PRE_PROCESSING_CRITICS_PATH,
-    PROJECT_NAME,
-    PROJECT_ROOT,
-    REQUIRED_SHEETS,
     XSD_2020_PATH,
     XSD_2025_PATH,
-    XML_ENCODING,
-    XML_VERSION,
     ensure_runtime_directories,
     find_missing_project_paths,
-    relative_to_project,
 )
 from src.domain.conversion import ConversionResult
 from src.gui.system_utils import default_output_root
+from src.presenters import (
+    print_conversion_result,
+    print_execution_failure,
+)
 from src.services import convert_excel
 from src.utils.dependency_check import (
-    RECOMMENDED_PYTHON,
     check_dependencies,
-    current_python_version,
     dependencies_are_compatible,
     is_python_version_compatible,
     is_tkinter_available,
@@ -91,149 +86,35 @@ def should_launch_gui(
 
 
 def validate_environment() -> bool:
-    """Confirma a estrutura e as dependências técnicas."""
-
-    print("=" * 72)
-    print(PROJECT_NAME.upper())
-    print("Etapa 6.1 - Interface desktop Tkinter/ttk")
-    print("=" * 72)
+    """Confirma silenciosamente estrutura e dependências técnicas."""
 
     error = False
     ensure_runtime_directories()
-
-    print("\n[1/5] Configuração central")
-    print(f"  Código do documento: {DOCUMENT_CODE}")
-    print(
-        f"  XML: versão {XML_VERSION}, "
-        f"encoding {XML_ENCODING}"
-    )
-    print(
-        "  Abas obrigatórias: "
-        f"{', '.join(REQUIRED_SHEETS)}"
-    )
-    print(f"  Raiz do projeto: {PROJECT_ROOT}")
-    print("  Configuração carregada. [OK]")
-
-    print("\n[2/5] Estrutura e fontes")
     missing = find_missing_project_paths()
 
     if missing:
         error = True
-        for path in missing:
-            print(
-                "  [ERRO] Caminho ausente: "
-                f"{relative_to_project(path)}"
-            )
-    else:
-        print(
-            "  Estrutura e fontes regulatórias "
-            "encontradas. [OK]"
-        )
 
-    print("\n[3/5] Arquivos regulatórios")
     for path in (
         XSD_2020_PATH,
         XSD_2025_PATH,
         PRE_PROCESSING_CRITICS_PATH,
         POST_PROCESSING_CRITICS_PATH,
     ):
-        if path.is_file():
-            print(
-                f"  {relative_to_project(path)} [OK]"
-            )
-        else:
+        if not path.is_file():
             error = True
-            print(
-                "  [ERRO] Arquivo ausente: "
-                f"{relative_to_project(path)}"
-            )
 
-    print("\n[4/5] Python e interface")
-    print(
-        f"  Python encontrado: "
-        f"{current_python_version()}"
-    )
-    print(
-        f"  Versão de referência: "
-        f"{RECOMMENDED_PYTHON}"
-    )
-
-    if is_python_version_compatible():
-        print("  Série Python 3.13 confirmada. [OK]")
-    else:
+    if not is_python_version_compatible():
         error = True
-        print(
-            "  [ERRO] O projeto exige Python 3.13.x."
-        )
 
-    if is_tkinter_available():
-        print("  Tkinter disponível. [OK]")
-    else:
+    if not is_tkinter_available():
         error = True
-        print(
-            "  [ERRO] Tkinter não está disponível."
-        )
-
-    print("\n[5/5] Dependências")
     statuses = check_dependencies()
-
-    for status in statuses:
-        prefix = (
-            "  "
-            if status.compatible
-            else "  [ERRO] "
-        )
-        print(f"{prefix}{status.message}")
 
     if not dependencies_are_compatible(statuses):
         error = True
 
     return not error
-
-
-def print_conversion_result(
-    result: ConversionResult,
-) -> None:
-    """Apresenta o resultado do modo terminal."""
-
-    print("\n" + "=" * 72)
-    print("RESULTADO DA CONVERSÃO")
-    print("=" * 72)
-    print(f"\nExecução: {result.execution_id}")
-    print(
-        f"Resultado final: {result.status.value}"
-    )
-    print(f"Mensagem: {result.final_message}")
-    print(
-        f"Duração: {result.duration_seconds:.3f} "
-        "segundo(s)"
-    )
-
-    print("\nEtapas:")
-    for record in result.stage_records:
-        print(
-            f"  [{record.status.value}] "
-            f"{record.stage.value} "
-            f"({record.duration_seconds:.3f}s)"
-        )
-
-    if result.decision.reasons:
-        print("\nMotivos e avisos:")
-        for reason in result.decision.reasons:
-            print(
-                f"  [{reason.severity}] "
-                f"{reason.code} - {reason.message}"
-            )
-
-    print("\nArquivos:")
-    print(
-        "  XML: "
-        f"{result.artifacts.xml_path or 'não gerado'}"
-    )
-    print(
-        "  XLSX: "
-        f"{result.artifacts.xlsx_path or 'não gerado'}"
-    )
 
 
 def process_excel(
@@ -264,14 +145,13 @@ def launch_desktop(
             initial_output_root=output_root,
         )
     except Exception as error:
-        print(
-            "\n[FALHA TÉCNICA] A interface gráfica "
-            "não pôde ser iniciada."
+        print_execution_failure(
+            "Inicialização da interface",
+            (
+                "A interface gráfica não pôde ser iniciada: "
+                f"{error}"
+            ),
         )
-        print(
-            f"Tipo: {type(error).__name__}"
-        )
-        print(f"Detalhes: {error}")
         return 2
 
 
@@ -283,7 +163,13 @@ def main(
     )
 
     if not validate_environment():
-        print("\nResultado: FALHA TÉCNICA")
+        print_execution_failure(
+            "Validação do ambiente",
+            (
+                "A estrutura, a versão do Python ou uma "
+                "dependência obrigatória não está disponível."
+            ),
+        )
         return 1
 
     if should_launch_gui(arguments):

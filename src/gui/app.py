@@ -9,7 +9,6 @@ from typing import Any
 
 from src.config import PROJECT_NAME
 from src.domain.conversion import ConversionResult
-from src.domain.reporting import FinalExecutionStatus
 from src.gui.controller import GuiController
 from src.gui.models import (
     GuiEvent,
@@ -22,9 +21,14 @@ from src.gui.system_utils import (
     default_output_root,
     open_path,
 )
+from src.presenters import print_interface_failure
 
 
 POLL_INTERVAL_MS = 150
+STATUS_AWAITING = "Aguardando"
+STATUS_PROCESSING = "Processando..."
+STATUS_COMPLETED = "Concluído"
+STATUS_TECHNICAL_FAILURE = "Falha técnica"
 
 
 class Dro5050Application(ttk.Frame):
@@ -50,24 +54,11 @@ class Dro5050Application(ttk.Frame):
         self.output_root_var = tk.StringVar(
             value=str(initial_output_root or default_output_root())
         )
-        self.output_hint_var = tk.StringVar()
-        self.status_var = tk.StringVar(
-            value="Selecione uma planilha Excel."
-        )
-        self.result_var = tk.StringVar(
-            value="AGUARDANDO EXECUÇÃO"
-        )
-
+        self.status_var = tk.StringVar(value=STATUS_AWAITING)
         self._configure_window()
         self._configure_styles()
         self._build_widgets()
-        self._update_output_hint()
         self._set_artifact_buttons_state(False)
-
-        self.output_root_var.trace_add(
-            "write",
-            lambda *_: self._update_output_hint(),
-        )
         self.master.protocol(
             "WM_DELETE_WINDOW",
             self._on_close,
@@ -79,14 +70,13 @@ class Dro5050Application(ttk.Frame):
 
     def _configure_window(self) -> None:
         self.master.title(PROJECT_NAME)
-        self.master.geometry("1120x700")
-        self.master.minsize(920, 620)
+        self.master.geometry("980x360")
+        self.master.minsize(760, 320)
         self.master.columnconfigure(0, weight=1)
         self.master.rowconfigure(0, weight=1)
 
         self.grid(row=0, column=0, sticky="nsew")
         self.columnconfigure(0, weight=1)
-        self.rowconfigure(2, weight=1)
 
     def _configure_styles(self) -> None:
         style = ttk.Style(self.master)
@@ -101,94 +91,54 @@ class Dro5050Application(ttk.Frame):
             font=("Segoe UI", 17, "bold"),
         )
         style.configure(
-            "Subtitle.TLabel",
-            font=("Segoe UI", 9),
-            foreground="#4A5568",
-        )
-        style.configure(
-            "Section.TLabelframe.Label",
-            font=("Segoe UI", 10, "bold"),
-        )
-        style.configure(
-            "Status.TLabel",
-            font=("Segoe UI", 10, "bold"),
-            padding=(8, 5),
-        )
-        style.configure(
-            "ResultWaiting.TLabel",
-            font=("Segoe UI", 12, "bold"),
-            foreground="#4A5568",
-        )
-        style.configure(
-            "ResultApt.TLabel",
-            font=("Segoe UI", 12, "bold"),
-            foreground="#137333",
-        )
-        style.configure(
-            "ResultNotApt.TLabel",
-            font=("Segoe UI", 12, "bold"),
-            foreground="#B45309",
-        )
-        style.configure(
-            "ResultFailure.TLabel",
-            font=("Segoe UI", 12, "bold"),
-            foreground="#B91C1C",
-        )
-        style.configure(
             "Primary.TButton",
             font=("Segoe UI", 10, "bold"),
             padding=(12, 7),
         )
-        style.configure("Treeview", rowheight=25)
+        style.configure(
+            "StatusAwaiting.TLabel",
+            font=("Segoe UI", 10, "bold"),
+            foreground="#4A5568",
+        )
+        style.configure(
+            "StatusProcessing.TLabel",
+            font=("Segoe UI", 10, "bold"),
+            foreground="#1D4ED8",
+        )
+        style.configure(
+            "StatusCompleted.TLabel",
+            font=("Segoe UI", 10, "bold"),
+            foreground="#137333",
+        )
+        style.configure(
+            "StatusFailure.TLabel",
+            font=("Segoe UI", 10, "bold"),
+            foreground="#B91C1C",
+        )
 
     def _build_widgets(self) -> None:
         self._build_title()
         self._build_selection()
-        self._build_results()
-        self._build_status_bar()
 
     def _build_title(self) -> None:
-        title_frame = ttk.Frame(self)
-        title_frame.grid(
-            row=0,
-            column=0,
-            sticky="ew",
-            pady=(0, 12),
-        )
-        title_frame.columnconfigure(0, weight=1)
-
         ttk.Label(
-            title_frame,
+            self,
             text="Conversor XLSX → XML DRO 5050",
             style="Title.TLabel",
-        ).grid(row=0, column=0, sticky="w")
-
-        ttk.Label(
-            title_frame,
-            text=(
-                "Selecione o Excel, escolha a pasta de saída "
-                "e execute a conversão completa."
-            ),
-            style="Subtitle.TLabel",
         ).grid(
-            row=1,
+            row=0,
             column=0,
             sticky="w",
-            pady=(3, 0),
+            pady=(0, 18),
         )
 
     def _build_selection(self) -> None:
-        frame = ttk.LabelFrame(
-            self,
-            text="1. Arquivos da execução",
-            style="Section.TLabelframe",
-            padding=12,
-        )
+        frame = ttk.Frame(self, padding=12)
         frame.grid(
             row=1,
             column=0,
             sticky="ew",
-            pady=(0, 10),
+            pady=(0, 4),
         )
         frame.columnconfigure(1, weight=1)
 
@@ -228,7 +178,7 @@ class Dro5050Application(ttk.Frame):
 
         ttk.Label(
             frame,
-            text="Pasta principal de saída:",
+            text="Pasta de saída:",
         ).grid(
             row=1,
             column=0,
@@ -272,17 +222,27 @@ class Dro5050Application(ttk.Frame):
             pady=4,
         )
 
-        ttk.Label(
-            frame,
-            textvariable=self.output_hint_var,
-            style="Subtitle.TLabel",
-        ).grid(
+        status_frame = ttk.Frame(frame)
+        status_frame.grid(
             row=2,
-            column=1,
-            columnspan=3,
-            sticky="w",
-            pady=(2, 8),
+            column=0,
+            columnspan=4,
+            sticky="ew",
+            pady=(14, 8),
         )
+        status_frame.columnconfigure(0, weight=1)
+        status_frame.columnconfigure(3, weight=1)
+        ttk.Label(
+            status_frame,
+            text="Status:",
+            font=("Segoe UI", 10),
+        ).grid(row=0, column=1, padx=(0, 8))
+        self.status_label = ttk.Label(
+            status_frame,
+            textvariable=self.status_var,
+            style="StatusAwaiting.TLabel",
+        )
+        self.status_label.grid(row=0, column=2)
 
         action_frame = ttk.Frame(frame)
         action_frame.grid(
@@ -290,18 +250,10 @@ class Dro5050Application(ttk.Frame):
             column=0,
             columnspan=4,
             sticky="ew",
-            pady=(4, 0),
+            pady=(8, 0),
         )
         action_frame.columnconfigure(0, weight=1)
-
-        ttk.Label(
-            action_frame,
-            text=(
-                "A versão regulatória será selecionada "
-                "automaticamente pela dataBase."
-            ),
-            style="Subtitle.TLabel",
-        ).grid(row=0, column=0, sticky="w")
+        action_frame.columnconfigure(4, weight=1)
 
         self.convert_button = ttk.Button(
             action_frame,
@@ -312,203 +264,29 @@ class Dro5050Application(ttk.Frame):
         self.convert_button.grid(
             row=0,
             column=1,
-            sticky="e",
+            padx=(0, 8),
         )
-
-    def _build_results(self) -> None:
-        frame = ttk.LabelFrame(
-            self,
-            text="2. Resultado da execução",
-            style="Section.TLabelframe",
-            padding=10,
-        )
-        frame.grid(
-            row=2,
-            column=0,
-            sticky="nsew",
-            pady=(0, 10),
-        )
-        frame.columnconfigure(0, weight=1)
-        frame.rowconfigure(1, weight=1)
-
-        summary = ttk.Frame(frame)
-        summary.grid(
-            row=0,
-            column=0,
-            sticky="ew",
-            pady=(0, 8),
-        )
-        summary.columnconfigure(0, weight=1)
-
-        self.result_label = ttk.Label(
-            summary,
-            textvariable=self.result_var,
-            style="ResultWaiting.TLabel",
-        )
-        self.result_label.grid(
-            row=0,
-            column=0,
-            sticky="w",
-        )
-
-        artifact_frame = ttk.Frame(summary)
-        artifact_frame.grid(
-            row=0,
-            column=1,
-            sticky="e",
-        )
-
         self.artifact_buttons = {
             "xml": ttk.Button(
-                artifact_frame,
+                action_frame,
                 text="Abrir XML",
                 command=lambda: self._open_artifact("xml"),
             ),
             "xlsx": ttk.Button(
-                artifact_frame,
+                action_frame,
                 text="Abrir relatório XLSX",
                 command=lambda: self._open_artifact("xlsx"),
             ),
         }
-
-        for index, button in enumerate(
-            self.artifact_buttons.values()
-        ):
-            button.grid(
-                row=0,
-                column=index,
-                padx=(6, 0),
-            )
-
-        notebook = ttk.Notebook(frame)
-        notebook.grid(
-            row=1,
-            column=0,
-            sticky="nsew",
-        )
-
-        stages_tab = ttk.Frame(
-            notebook,
-            padding=6,
-        )
-        messages_tab = ttk.Frame(
-            notebook,
-            padding=6,
-        )
-        notebook.add(stages_tab, text="Etapas")
-        notebook.add(
-            messages_tab,
-            text="Mensagens e motivos",
-        )
-
-        stages_tab.columnconfigure(0, weight=1)
-        stages_tab.rowconfigure(0, weight=1)
-
-        self.stage_tree = ttk.Treeview(
-            stages_tab,
-            columns=(
-                "status",
-                "duration",
-                "message",
-            ),
-            show="tree headings",
-        )
-        self.stage_tree.heading("#0", text="Etapa")
-        self.stage_tree.heading(
-            "status",
-            text="Situação",
-        )
-        self.stage_tree.heading(
-            "duration",
-            text="Duração",
-        )
-        self.stage_tree.heading(
-            "message",
-            text="Mensagem",
-        )
-        self.stage_tree.column(
-            "#0",
-            width=230,
-            stretch=False,
-        )
-        self.stage_tree.column(
-            "status",
-            width=170,
-            stretch=False,
-        )
-        self.stage_tree.column(
-            "duration",
-            width=90,
-            anchor="e",
-            stretch=False,
-        )
-        self.stage_tree.column(
-            "message",
-            width=500,
-            stretch=True,
-        )
-        self.stage_tree.grid(
+        self.artifact_buttons["xml"].grid(
             row=0,
-            column=0,
-            sticky="nsew",
+            column=2,
+            padx=(0, 8),
         )
-
-        tree_scroll = ttk.Scrollbar(
-            stages_tab,
-            orient="vertical",
-            command=self.stage_tree.yview,
-        )
-        tree_scroll.grid(
+        self.artifact_buttons["xlsx"].grid(
             row=0,
-            column=1,
-            sticky="ns",
+            column=3,
         )
-        self.stage_tree.configure(
-            yscrollcommand=tree_scroll.set
-        )
-
-        messages_tab.columnconfigure(0, weight=1)
-        messages_tab.rowconfigure(0, weight=1)
-
-        self.messages_text = tk.Text(
-            messages_tab,
-            wrap="word",
-            height=12,
-            font=("Consolas", 9),
-            state="disabled",
-            padx=8,
-            pady=8,
-        )
-        self.messages_text.grid(
-            row=0,
-            column=0,
-            sticky="nsew",
-        )
-
-        messages_scroll = ttk.Scrollbar(
-            messages_tab,
-            orient="vertical",
-            command=self.messages_text.yview,
-        )
-        messages_scroll.grid(
-            row=0,
-            column=1,
-            sticky="ns",
-        )
-        self.messages_text.configure(
-            yscrollcommand=messages_scroll.set
-        )
-
-    def _build_status_bar(self) -> None:
-        frame = ttk.Frame(self)
-        frame.grid(row=3, column=0, sticky="ew")
-        frame.columnconfigure(0, weight=1)
-
-        ttk.Label(
-            frame,
-            textvariable=self.status_var,
-            style="Status.TLabel",
-        ).grid(row=0, column=0, sticky="w")
 
     def _browse_excel(self) -> None:
         selected = filedialog.askopenfilename(
@@ -528,12 +306,6 @@ class Dro5050Application(ttk.Frame):
 
         self.excel_var.set(selected)
         self._clear_result()
-        self.status_var.set(
-            "Planilha selecionada. Pronto para converter."
-        )
-        self._append_message(
-            f"Arquivo selecionado: {selected}"
-        )
 
     def _browse_output(self) -> None:
         selected = filedialog.askdirectory(
@@ -564,9 +336,6 @@ class Dro5050Application(ttk.Frame):
             return
 
         self._clear_result()
-        self._append_message(
-            f"Arquivo selecionado: {path}"
-        )
         self.controller.start_conversion(
             path,
             output_root,
@@ -626,13 +395,18 @@ class Dro5050Application(ttk.Frame):
     ) -> None:
         if event.kind == GuiEventKind.STARTED:
             self._set_busy(True)
-            self.status_var.set(event.message)
-            self._append_message(event.message)
+            self._set_status(
+                STATUS_PROCESSING,
+                "StatusProcessing.TLabel",
+            )
             return
 
         if event.kind == GuiEventKind.REJECTED:
-            self.status_var.set(event.message)
-            self._append_message(event.message)
+            messagebox.showwarning(
+                "Operação não iniciada",
+                event.message,
+                parent=self.master,
+            )
             return
 
         self._set_busy(False)
@@ -660,72 +434,28 @@ class Dro5050Application(ttk.Frame):
         result: ConversionResult,
     ) -> None:
         self._result = result
-        self.result_var.set(result.status.value)
-
-        style = {
-            FinalExecutionStatus.APT: "ResultApt.TLabel",
-            FinalExecutionStatus.NOT_APT: (
-                "ResultNotApt.TLabel"
-            ),
-            FinalExecutionStatus.TECHNICAL_FAILURE: (
-                "ResultFailure.TLabel"
-            ),
-        }[result.status]
-        self.result_label.configure(style=style)
-
-        for item in self.stage_tree.get_children():
-            self.stage_tree.delete(item)
-
-        for record in result.stage_records:
-            self.stage_tree.insert(
-                "",
-                "end",
-                text=record.stage.value,
-                values=(
-                    record.status.value,
-                    f"{record.duration_seconds:.3f}s",
-                    record.message,
-                ),
-            )
-
-        self._append_message(
-            f"Resultado final: {result.status.value}"
-        )
-        self._append_message(
-            f"Execução: {result.execution_id}"
-        )
-        self._append_message(
-            f"Mensagem: {result.final_message}"
-        )
-
-        for reason in result.decision.reasons:
-            self._append_message(
-                (
-                    f"[{reason.severity}] "
-                    f"{reason.code} — "
-                    f"{reason.message}"
-                )
-            )
-
         self._artifact_paths = {
             "xml": result.artifacts.xml_path,
             "xlsx": result.artifacts.xlsx_path,
         }
         self._set_artifact_buttons_state(True)
 
-        self.status_var.set(
-            (
-                "Execução concluída em "
-                f"{result.duration_seconds:.3f}s."
-            )
-        )
-
         if result.has_technical_failure:
+            self._set_status(
+                STATUS_TECHNICAL_FAILURE,
+                "StatusFailure.TLabel",
+            )
             messagebox.showerror(
                 "Falha técnica",
                 result.final_message,
                 parent=self.master,
             )
+            return
+
+        self._set_status(
+            STATUS_COMPLETED,
+            "StatusCompleted.TLabel",
+        )
 
     def _handle_task_error(
         self,
@@ -742,18 +472,15 @@ class Dro5050Application(ttk.Frame):
             )
         )
 
-        self.status_var.set(
-            "Falha técnica na interface."
+        self._set_status(
+            STATUS_TECHNICAL_FAILURE,
+            "StatusFailure.TLabel",
         )
-        self.result_var.set("FALHA TÉCNICA")
-        self.result_label.configure(
-            style="ResultFailure.TLabel"
-        )
-        self._append_message(
-            (
-                f"[FALHA TÉCNICA] {error.code} "
-                f"— {error.message}"
-            )
+        print_interface_failure(
+            code=error.code,
+            message=error.message,
+            exception_type=error.exception_type,
+            details=error.details,
         )
         messagebox.showerror(
             f"Falha em {task.value}",
@@ -832,46 +559,22 @@ class Dro5050Application(ttk.Frame):
                 parent=self.master,
             )
 
-    def _update_output_hint(self) -> None:
-        raw = self.output_root_var.get().strip()
-        if not raw:
-            self.output_hint_var.set("")
-            return
-
-        root = Path(raw).expanduser()
-        self.output_hint_var.set(
-            (
-                f"XML e relatório Excel: {root}"
-            )
-        )
-
     def _clear_result(self) -> None:
         self._result = None
-        self.result_var.set("AGUARDANDO EXECUÇÃO")
-        self.result_label.configure(
-            style="ResultWaiting.TLabel"
-        )
         self._artifact_paths.clear()
         self._set_artifact_buttons_state(False)
-
-        for item in self.stage_tree.get_children():
-            self.stage_tree.delete(item)
-
-        self.messages_text.configure(state="normal")
-        self.messages_text.delete("1.0", "end")
-        self.messages_text.configure(state="disabled")
-
-    def _append_message(
-        self,
-        message: str,
-    ) -> None:
-        self.messages_text.configure(state="normal")
-        self.messages_text.insert(
-            "end",
-            message.rstrip() + "\n",
+        self._set_status(
+            STATUS_AWAITING,
+            "StatusAwaiting.TLabel",
         )
-        self.messages_text.see("end")
-        self.messages_text.configure(state="disabled")
+
+    def _set_status(
+        self,
+        text: str,
+        style: str,
+    ) -> None:
+        self.status_var.set(text)
+        self.status_label.configure(style=style)
 
     def _on_close(self) -> None:
         if self.controller.busy:

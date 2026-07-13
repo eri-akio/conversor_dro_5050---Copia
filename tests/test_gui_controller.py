@@ -122,6 +122,7 @@ def test_conversion_receives_derived_directories(
     controller = GuiController(
         preview_callable=preview_result,
         convert_callable=fake_convert,
+        result_presenter=lambda result: None,
     )
 
     output_root = tmp_path / "saida"
@@ -147,6 +148,25 @@ def test_conversion_receives_derived_directories(
     )
     assert "reports_dir" not in captured
     assert "logs_dir" not in captured
+
+
+def test_conversion_result_is_presented_once(
+    tmp_path: Path,
+) -> None:
+    result = SimpleNamespace(status="CONCLUÍDO")
+    presented: list[object] = []
+    controller = GuiController(
+        preview_callable=preview_result,
+        convert_callable=lambda *args, **kwargs: result,
+        result_presenter=presented.append,
+    )
+
+    assert controller.start_conversion("entrada.xlsx", tmp_path)
+    wait_event(controller, GuiEventKind.STARTED)
+    completed = wait_event(controller, GuiEventKind.COMPLETED)
+
+    assert completed.payload is result
+    assert presented == [result]
 
 
 def test_controller_rejects_second_operation(

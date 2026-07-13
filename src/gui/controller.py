@@ -21,6 +21,7 @@ from src.gui.models import (
     GuiTaskKind,
     HeaderPreviewResult,
 )
+from src.presenters import print_gui_conversion_result
 from src.services.conversion_service import (
     convert_excel,
 )
@@ -31,6 +32,7 @@ PreviewCallable = Callable[
     HeaderPreviewResult,
 ]
 ConvertCallable = Callable[..., ConversionResult]
+ResultPresenter = Callable[[ConversionResult], None]
 
 
 class GuiController:
@@ -41,6 +43,7 @@ class GuiController:
         *,
         preview_callable: PreviewCallable | None = None,
         convert_callable: ConvertCallable | None = None,
+        result_presenter: ResultPresenter | None = None,
     ) -> None:
         self._preview = (
             preview_callable
@@ -49,6 +52,9 @@ class GuiController:
         self._convert = (
             convert_callable
             or convert_excel
+        )
+        self._present_result = (
+            result_presenter or print_gui_conversion_result
         )
         self._events: Queue[GuiEvent] = Queue()
         self._lock = Lock()
@@ -95,10 +101,12 @@ class GuiController:
 
         def convert() -> ConversionResult:
             directories.ensure()
-            return self._convert(
+            result = self._convert(
                 input_path,
                 output_dir=directories.root,
             )
+            self._present_result(result)
+            return result
 
         return self._start(
             task=GuiTaskKind.CONVERSION,

@@ -39,12 +39,10 @@ Status histórico
 
 ### Ocorrencias
 
-Apresenta estas 19 colunas:
+Apresenta estas 11 colunas:
 
 ```text
-Resultado Final
 Etapa
-Aba
 Linha
 idEvento
 Coluna
@@ -53,18 +51,12 @@ Valor Normalizado
 Regra
 Descrição da Regra
 Origem
-Versão
-Gravidade
 Status
-Sugestão
 Mensagem
-Dependência
-Escopo
-Resultado Definitivo
 ```
 
-Para regras adiadas, `Status` preserva o valor `ADIADA` e `Resultado
-Definitivo` apresenta a decisão produzida no nível do evento.
+`Status` corresponde à gravidade da ocorrência, com valores como `ERRO
+IMPEDITIVO`, `ERRO`, `AVISO` e `INFORMAÇÃO`.
 
 ## Execução
 

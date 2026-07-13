@@ -230,29 +230,35 @@ def test_xlsx_contains_required_sheets_and_columns(
     headers = tuple(
         cell.value for cell in occurrences[1]
     )
-    assert len(headers) == 19
+    assert len(headers) == 11
 
-    for header in (
-        "Resultado Final",
+    assert headers == (
+        "Etapa",
+        "Linha",
         "idEvento",
+        "Coluna",
         "Valor Original",
         "Valor Normalizado",
         "Regra",
+        "Descrição da Regra",
         "Origem",
-        "Versão",
-        "Gravidade",
         "Status",
-        "Sugestão",
-        "Escopo",
-        "Resultado Definitivo",
-    ):
-        assert header in headers
+        "Mensagem",
+    )
 
     for removed_header in (
         "Execução",
         "Data/Hora",
         "Arquivo de Entrada",
         "Arquivo XML",
+        "Aba",
+        "Dependência",
+        "Resultado Final",
+        "Versão",
+        "Gravidade",
+        "Sugestão",
+        "Escopo",
+        "Resultado Definitivo",
     ):
         assert removed_header not in headers
 

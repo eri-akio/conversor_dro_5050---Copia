@@ -22,11 +22,14 @@ python main.py --gui
 python -m src.gui
 ```
 
-A interface foi simplificada para duas áreas:
+A interface foi simplificada para um único formulário:
 
 ```text
-1. Arquivos da execução
-2. Resultado da execução
+Conversor XLSX → XML DRO 5050
+Planilha Excel
+Pasta de saída
+Status
+Converter | Abrir XML | Abrir relatório XLSX | Abrir pasta
 ```
 
 Ela permite:
@@ -35,8 +38,7 @@ Ela permite:
 selecionar a planilha .xlsx
 selecionar a pasta principal de saída
 executar a conversão sem congelar a janela
-acompanhar as etapas concluídas
-visualizar o status final
+acompanhar Aguardando, Processando..., Concluído ou Falha técnica
 abrir XML e relatório XLSX
 ```
 
@@ -56,8 +58,9 @@ Relatorio_DRO_5050_AAAA-MM.xlsx
 A versão regulatória continua sendo selecionada automaticamente pela
 `dataBase`, mas o quadro de cabeçalho e versão não é mais exibido na tela.
 
-A barra de processamento também foi removida. O andamento é informado pelo
-texto de status e pela relação de etapas.
+A área de mensagens, as seções numeradas e as barras de rolagem foram
+removidas. O resumo regulatório da execução iniciada pela interface é
+apresentado no terminal, sem expor os caminhos dos artefatos.
 
 ## Processamento em segundo plano
 
@@ -92,6 +95,9 @@ O modo terminal continua disponível quando o caminho do Excel é informado:
 python main.py "D:\dados\DRO_5050.xlsx"
 ```
 
+Sua saída é uma tabela única com `Etapa`, `Situação` e `Mensagem`, na ordem
+registrada pelo serviço de conversão, seguida pelo status final.
+
 Pastas personalizadas:
 
 ```powershell
@@ -115,5 +121,6 @@ python -m pytest -v
 Teste específico da simplificação:
 
 ```powershell
-python -m pytest tests/test_gui_simplified_layout.py -v
+python -m pytest tests/test_terminal_presenter.py `
+  tests/test_gui_simplified_layout.py -v
 ```

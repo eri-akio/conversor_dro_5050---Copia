@@ -14,6 +14,7 @@ from src.domain.reporting import (
     LocalValidationStatus,
     XsdValidationSummaryStatus,
 )
+from src.presenters import print_conversion_result
 from src.services import convert_excel
 
 from .workbook_factory import (
@@ -27,6 +28,7 @@ from .workbook_factory import (
 
 def test_complete_pipeline_keeps_status_scopes_and_only_two_artifacts(
     tmp_path: Path,
+    capsys,
 ) -> None:
     path = create_workbook(
         tmp_path / "complete.xlsx",
@@ -42,6 +44,7 @@ def test_complete_pipeline_keeps_status_scopes_and_only_two_artifacts(
     output = tmp_path / "output"
 
     result = convert_excel(path, output_dir=output)
+    print_conversion_result(result)
 
     assert result.status == FinalExecutionStatus.NOT_APT
     assert result.status_local == LocalValidationStatus.REPROVED
@@ -59,6 +62,12 @@ def test_complete_pipeline_keeps_status_scopes_and_only_two_artifacts(
     }
     assert not (output / "logs").exists()
     assert not list(output.glob("*.txt"))
+    terminal = capsys.readouterr().out
+    assert "Etapa" in terminal
+    assert "Situação" in terminal
+    assert "Mensagem" in terminal
+    assert "Status final" in terminal
+    assert terminal.count("LEITURA DO EXCEL") == 1
 
 
 @pytest.mark.parametrize("missing_kind", ["system", "account"])
@@ -97,4 +106,3 @@ def test_unreadable_input_is_reported_as_technical_failure(
     assert result.failed_stage is not None
     assert result.failed_stage.stage == ConversionStage.READ_EXCEL
     assert result.exit_code == 2
-

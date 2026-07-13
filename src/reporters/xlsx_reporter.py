@@ -29,9 +29,7 @@ STATUS_FILLS = {
 }
 
 OCCURRENCE_HEADERS = (
-    "Resultado Final",
     "Etapa",
-    "Aba",
     "Linha",
     "idEvento",
     "Coluna",
@@ -40,14 +38,8 @@ OCCURRENCE_HEADERS = (
     "Regra",
     "Descrição da Regra",
     "Origem",
-    "Versão",
-    "Gravidade",
     "Status",
-    "Sugestão",
     "Mensagem",
-    "Dependência",
-    "Escopo",
-    "Resultado Definitivo",
 )
 
 
@@ -151,43 +143,43 @@ class XlsxReportWriter:
             (
                 "ERRO IMPEDITIVO",
                 (
-                    "=COUNTIF('Ocorrencias'!$M$2:"
-                    f'$M${occurrence_end_row},"ERRO IMPEDITIVO")'
+                    "=COUNTIF('Ocorrencias'!$J$2:"
+                    f'$J${occurrence_end_row},"ERRO IMPEDITIVO")'
                 ),
             ),
             (
                 "ERRO",
                 (
-                    "=COUNTIF('Ocorrencias'!$M$2:"
-                    f'$M${occurrence_end_row},"ERRO")'
+                    "=COUNTIF('Ocorrencias'!$J$2:"
+                    f'$J${occurrence_end_row},"ERRO")'
                 ),
             ),
             (
                 "AVISO",
                 (
-                    "=COUNTIF('Ocorrencias'!$M$2:"
-                    f'$M${occurrence_end_row},"AVISO")'
+                    "=COUNTIF('Ocorrencias'!$J$2:"
+                    f'$J${occurrence_end_row},"AVISO")'
                 ),
             ),
             (
                 "INFORMAÇÃO",
                 (
-                    "=COUNTIF('Ocorrencias'!$M$2:"
-                    f'$M${occurrence_end_row},"INFORMAÇÃO")'
+                    "=COUNTIF('Ocorrencias'!$J$2:"
+                    f'$J${occurrence_end_row},"INFORMAÇÃO")'
                 ),
             ),
             (
                 "REGRA NÃO EXECUTADA",
-                (
-                    "=COUNTIF('Ocorrencias'!$N$2:"
-                    f'$N${occurrence_end_row},"REGRA NÃO EXECUTADA")'
+                sum(
+                    record.status == "REGRA NÃO EXECUTADA"
+                    for record in data.records
                 ),
             ),
             (
                 "REPROVADA",
-                (
-                    "=COUNTIF('Ocorrencias'!$N$2:"
-                    f'$N${occurrence_end_row},"REPROVADA")'
+                sum(
+                    record.status == "REPROVADA"
+                    for record in data.records
                 ),
             ),
         )
@@ -262,9 +254,7 @@ class XlsxReportWriter:
         for record in data.records:
             sheet.append(
                 (
-                    record.final_result.value,
                     record.stage,
-                    record.sheet_name,
                     record.row_numbers,
                     record.id_evento,
                     record.columns,
@@ -273,14 +263,8 @@ class XlsxReportWriter:
                     record.rule_code,
                     record.rule_description,
                     record.source,
-                    record.version,
                     record.severity,
-                    record.status,
-                    record.suggestion,
                     record.message,
-                    record.dependency,
-                    record.scope,
-                    record.definitive_result,
                 )
             )
 
@@ -320,34 +304,27 @@ class XlsxReportWriter:
                 cell.alignment = Alignment(wrap_text=True, vertical="top")
 
         widths = {
-            "A": 22,
-            "B": 24,
-            "C": 18,
-            "D": 12,
-            "E": 20,
-            "F": 24,
-            "G": 30,
-            "H": 30,
-            "I": 18,
-            "J": 42,
-            "K": 30,
-            "L": 18,
-            "M": 22,
-            "N": 22,
-            "O": 38,
-            "P": 48,
-            "Q": 34,
+            "A": 24,
+            "B": 12,
+            "C": 20,
+            "D": 24,
+            "E": 30,
+            "F": 30,
+            "G": 18,
+            "H": 42,
+            "I": 30,
+            "J": 22,
+            "K": 48,
         }
         for column, width in widths.items():
             sheet.column_dimensions[column].width = width
 
         if data.records:
-            severity_range = f"M2:M{end_row}"
-            status_range = f"N2:N{end_row}"
+            severity_range = f"J2:J{end_row}"
             sheet.conditional_formatting.add(
                 severity_range,
                 FormulaRule(
-                    formula=['$M2="ERRO IMPEDITIVO"'],
+                    formula=['$J2="ERRO IMPEDITIVO"'],
                     fill=_fill("F4CCCC"),
                     font=Font(bold=True, color="9C0006"),
                 ),
@@ -355,7 +332,7 @@ class XlsxReportWriter:
             sheet.conditional_formatting.add(
                 severity_range,
                 FormulaRule(
-                    formula=['$M2="ERRO"'],
+                    formula=['$J2="ERRO"'],
                     fill=_fill("FCE5CD"),
                     font=Font(color="9C5700"),
                 ),
@@ -363,17 +340,9 @@ class XlsxReportWriter:
             sheet.conditional_formatting.add(
                 severity_range,
                 FormulaRule(
-                    formula=['$M2="AVISO"'],
+                    formula=['$J2="AVISO"'],
                     fill=_fill("FFF2CC"),
                     font=Font(color="7F6000"),
-                ),
-            )
-            sheet.conditional_formatting.add(
-                status_range,
-                FormulaRule(
-                    formula=['$N2="REGRA NÃO EXECUTADA"'],
-                    fill=_fill("D9D2E9"),
-                    font=Font(color="674EA7"),
                 ),
             )
 
