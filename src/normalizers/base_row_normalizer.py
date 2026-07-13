@@ -203,6 +203,31 @@ class BaseRowNormalizer:
                     )
                 )
 
+            if (
+                column_name in {"idEvento", "idEventoAgregador"}
+                and result.is_valid
+                and isinstance(result.original_value, str)
+                and "-" in result.original_value.strip()
+                and result.original_value.strip().replace("-", "")
+                == result.serialized_value
+            ):
+                issues.append(
+                    BaseRowIssue(
+                        code="BASE-NORM-ID-EVENTO-INFO-001",
+                        severity=SEVERITY_INFORMATION,
+                        message=(
+                            "Separadores permitidos foram removidos do "
+                            f"{column_name}."
+                        ),
+                        row_number=row.row_number,
+                        column_name=column_name,
+                        coordinate=cell.coordinate,
+                        original_value=result.original_value,
+                        normalized_value=result.serialized_value,
+                        rule_code="NORM-ID-EVENTO-001",
+                    )
+                )
+
             if cell.is_formula and result.is_valid:
                 issues.append(
                     BaseRowIssue(

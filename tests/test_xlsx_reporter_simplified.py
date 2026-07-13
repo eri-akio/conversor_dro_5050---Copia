@@ -49,6 +49,8 @@ REMOVED_OCCURRENCE_HEADERS = {
     "Data/Hora",
     "Arquivo de Entrada",
     "Arquivo XML",
+    "Valor Original",
+    "Valor Normalizado",
     "Aba",
     "Dependência",
     "Resultado Final",
@@ -63,8 +65,6 @@ EXPECTED_OCCURRENCE_HEADERS = (
     "Linha",
     "idEvento",
     "Coluna",
-    "Valor Original",
-    "Valor Normalizado",
     "Regra",
     "Descrição da Regra",
     "Origem",
@@ -168,14 +168,21 @@ class SimplifiedXlsxReporterTests(unittest.TestCase):
         headers = tuple(cell.value for cell in occurrences[1])
         self.assertEqual(headers, OCCURRENCE_HEADERS)
         self.assertEqual(headers, EXPECTED_OCCURRENCE_HEADERS)
-        self.assertEqual(len(headers), 12)
+        self.assertEqual(len(headers), 10)
         self.assertTrue(REMOVED_OCCURRENCE_HEADERS.isdisjoint(headers))
         self.assertEqual(occurrences["A2"].value, "VALIDAÇÃO")
-        self.assertEqual(occurrences["J2"].value, "ERRO IMPEDITIVO")
-        self.assertEqual(occurrences["K2"].value, "REPROVADA")
-        self.assertEqual(occurrences["L2"].value, "Valor inválido")
+        self.assertEqual(occurrences["D2"].value, "A")
+        self.assertEqual(occurrences["H2"].value, "ERRO IMPEDITIVO")
+        self.assertEqual(occurrences["I2"].value, "REPROVADA")
+        self.assertEqual(occurrences["J2"].value, "Valor inválido")
+        self.assertEqual(record.original_value, "x")
+        self.assertEqual(record.normalized_value, "X")
         self.assertEqual(occurrences.freeze_panes, "A2")
-        self.assertEqual(occurrences.tables["OccurrencesTable"].ref, "A1:L2")
+        self.assertEqual(occurrences.tables["OccurrencesTable"].ref, "A1:J2")
+        conditional_ranges = {
+            str(item.sqref) for item in occurrences.conditional_formatting
+        }
+        self.assertEqual(conditional_ranges, {"H2", "I2"})
 
 
 if __name__ == "__main__":

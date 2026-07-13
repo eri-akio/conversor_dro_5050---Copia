@@ -596,7 +596,12 @@ class ExecutionReportCollector:
                 ),
                 source="Normalizador local",
                 severity=issue.severity,
-                status="REPROVADA",
+                status=(
+                    "NORMALIZADO"
+                    if issue.code
+                    == "BASE-NORM-ID-EVENTO-INFO-001"
+                    else "REPROVADA"
+                ),
                 suggestion=None,
                 message=issue.message,
                 dependency=None,

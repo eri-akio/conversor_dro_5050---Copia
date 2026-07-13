@@ -277,7 +277,7 @@ def test_future_profile_normalizes_future_fields_without_inventing_domain(
     values = valid_row_values()
     values["tipoAvaliacao"] = "IE"
     values["naturezaContingencia"] = "OUT"
-    values["idEventoAgregador"] = "AGREG0001"
+    values["idEventoAgregador"] = "AGREG-0001"
     values["dataExclusao"] = "31/12/2026"
     values["motivoExclusao"] = "8 - Outro motivo"
 
@@ -303,6 +303,17 @@ def test_future_profile_normalizes_future_fields_without_inventing_domain(
     assert row.get_serialized_value(
         "motivoExclusao"
     ) == "8"
+    assert row.get_serialized_value(
+        "idEventoAgregador"
+    ) == "AGREG0001"
+    aggregator_issue = next(
+        issue
+        for issue in row.issues
+        if issue.code == "BASE-NORM-ID-EVENTO-INFO-001"
+        and issue.column_name == "idEventoAgregador"
+    )
+    assert aggregator_issue.original_value == "AGREG-0001"
+    assert aggregator_issue.normalized_value == "AGREG0001"
     assert any(
         issue.code == "BASE-REGRA-NE-001"
         for issue in row.issues
@@ -314,7 +325,7 @@ def test_invalid_values_make_only_that_row_invalid(
 ) -> None:
     first = valid_row_values()
     second = valid_row_values()
-    second["idEvento"] = "EVT-0002"
+    second["idEvento"] = "EVT--0002"
     second["totalPerdaEfetiva"] = "1.222"
 
     excel_path = tmp_path / "linha_invalida.xlsx"

@@ -230,15 +230,13 @@ def test_xlsx_contains_required_sheets_and_columns(
     headers = tuple(
         cell.value for cell in occurrences[1]
     )
-    assert len(headers) == 12
+    assert len(headers) == 10
 
     assert headers == (
         "Etapa",
         "Linha",
         "idEvento",
         "Coluna",
-        "Valor Original",
-        "Valor Normalizado",
         "Regra",
         "Descrição da Regra",
         "Origem",
@@ -252,6 +250,8 @@ def test_xlsx_contains_required_sheets_and_columns(
         "Data/Hora",
         "Arquivo de Entrada",
         "Arquivo XML",
+        "Valor Original",
+        "Valor Normalizado",
         "Aba",
         "Dependência",
         "Resultado Final",

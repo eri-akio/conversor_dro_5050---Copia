@@ -94,6 +94,38 @@ def test_missing_reference_is_a_local_regulatory_failure(
     assert not result.has_technical_failure
 
 
+def test_normalized_event_id_collision_reproves_without_merging(
+    tmp_path: Path,
+) -> None:
+    path = create_workbook(
+        tmp_path / "collision.xlsx",
+        rows=(
+            make_row(
+                event_id="IND-0001",
+                overrides={"codigoEventoOrigem": "ORIGIND001"},
+            ),
+            make_row(
+                event_id="IND0001",
+                overrides={"codigoEventoOrigem": "ORIGIND002"},
+            ),
+        ),
+    )
+
+    result = convert_excel(path, output_dir=tmp_path / "output")
+    grouping = result.output(ConversionStage.GROUP_EVENTS)
+
+    assert result.status_local == LocalValidationStatus.REPROVED
+    assert grouping.event_count == 0
+    assert grouping.ungrouped_row_numbers == (2, 3)
+    collision = next(
+        rule
+        for rule in grouping.rule_results
+        if rule.code == "MAP-EVT-ID-COLISAO-001"
+    )
+    assert collision.row_numbers == (2, 3)
+    assert collision.id_evento == "IND0001"
+
+
 def test_unreadable_input_is_reported_as_technical_failure(
     tmp_path: Path,
 ) -> None:

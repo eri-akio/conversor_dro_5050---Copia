@@ -5,6 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from openpyxl import Workbook
+import pytest
 
 from src.config import BASE_ALL_COLUMNS
 from src.domain.base_row_validation import RuleExecutionStatus
@@ -177,6 +178,65 @@ def test_two_rows_create_one_event_and_preserve_accountings(
     assert event.probabilities[0].source_rows == (2,)
     assert grouping.is_valid
     assert validation.is_valid
+
+
+def test_repeated_hyphenated_id_is_normalized_and_grouped(
+    tmp_path: Path,
+) -> None:
+    first = base_values()
+    second = base_values()
+    first['idEvento'] = 'IND-0001'
+    second['idEvento'] = 'IND-0001'
+    second['dataContabilizacao'] = '2025-06-20'
+
+    grouping, _ = process(tmp_path, [first, second])
+
+    assert grouping.is_valid
+    assert grouping.event_count == 1
+    assert grouping.events[0].id_evento == 'IND0001'
+    assert grouping.events[0].row_numbers == (2, 3)
+    assert not any(
+        result.code == 'MAP-EVT-ID-COLISAO-001'
+        for result in grouping.rule_results
+    )
+
+
+@pytest.mark.parametrize(
+    ('first_id', 'second_id', 'normalized_id'),
+    [
+        ('IND-0001', 'IND0001', 'IND0001'),
+        ('IND-00-01', 'IND0-001', 'IND0001'),
+    ],
+)
+def test_distinct_original_ids_cannot_collide_after_normalization(
+    tmp_path: Path,
+    first_id: str,
+    second_id: str,
+    normalized_id: str,
+) -> None:
+    first = base_values()
+    second = base_values()
+    first['idEvento'] = first_id
+    second['idEvento'] = second_id
+
+    grouping, _ = process(tmp_path, [first, second])
+
+    assert not grouping.is_valid
+    assert grouping.event_count == 0
+    assert grouping.ungrouped_row_numbers == (2, 3)
+    collisions = [
+        result
+        for result in grouping.rule_results
+        if result.code == 'MAP-EVT-ID-COLISAO-001'
+    ]
+    assert len(collisions) == 1
+    collision = collisions[0]
+    assert collision.status == RuleExecutionStatus.FAILED
+    assert collision.severity == 'ERRO IMPEDITIVO'
+    assert collision.id_evento == normalized_id
+    assert collision.row_numbers == (2, 3)
+    assert first_id in collision.message
+    assert second_id in collision.message
 
 
 def test_conflicting_event_attribute_is_not_chosen(

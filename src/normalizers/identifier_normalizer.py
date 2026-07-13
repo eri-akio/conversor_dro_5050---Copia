@@ -8,6 +8,7 @@ possível saber se o Excel já eliminou zeros significativos.
 from __future__ import annotations
 
 from collections.abc import Collection
+from dataclasses import replace
 from decimal import Decimal
 import math
 import re
@@ -25,6 +26,9 @@ from src.normalizers.null_normalizer import is_null_candidate
 _BACEN_WITH_DESCRIPTION_PATTERN = re.compile(
     r"^\s*(?P<code>[ZIzi][0-9]+)"
     r"(?:\s*-\s*(?P<description>.+))?\s*$"
+)
+_EVENT_ID_WITH_SEPARATORS_PATTERN = re.compile(
+    r"^[A-Za-z0-9]+(?:-[A-Za-z0-9]+)+$"
 )
 
 
@@ -130,10 +134,23 @@ def normalize_identifier(
 def normalize_event_id(
     value: Any,
 ) -> NormalizationResult[str]:
-    """Normaliza ``idEvento`` conforme os XSDs fornecidos."""
+    """Remove separadores seguros e valida ``idEvento`` para o XSD.
 
-    return normalize_identifier(
-        value,
+    Apenas hifens posicionados entre blocos alfanuméricos são removidos.
+    Entradas ambíguas ou malformadas permanecem inalteradas e são rejeitadas
+    pela validação final do identificador.
+    """
+
+    candidate = value
+    removed_separators = False
+    if isinstance(value, str):
+        stripped = value.strip()
+        if _EVENT_ID_WITH_SEPARATORS_PATTERN.fullmatch(stripped):
+            candidate = stripped.replace("-", "")
+            removed_separators = True
+
+    result = normalize_identifier(
+        candidate,
         pattern=r"[0-9A-Za-z]+",
         min_length=1,
         max_length=40,
@@ -142,6 +159,15 @@ def normalize_event_id(
         format_issue_code="ID-EVENTO-FMT-001",
         length_issue_code="ID-EVENTO-TAMANHO-001",
     )
+
+    if removed_separators:
+        return replace(
+            result,
+            original_value=value,
+            changed=True,
+        )
+
+    return result
 
 
 def normalize_source_system_code(

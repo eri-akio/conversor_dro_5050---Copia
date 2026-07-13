@@ -33,8 +33,6 @@ OCCURRENCE_HEADERS = (
     "Linha",
     "idEvento",
     "Coluna",
-    "Valor Original",
-    "Valor Normalizado",
     "Regra",
     "Descrição da Regra",
     "Origem",
@@ -229,8 +227,6 @@ class XlsxReportWriter:
                     record.row_numbers,
                     record.id_evento,
                     record.columns,
-                    record.original_value,
-                    record.normalized_value,
                     record.rule_code,
                     record.rule_description,
                     record.source,
@@ -280,33 +276,31 @@ class XlsxReportWriter:
             "B": 12,
             "C": 20,
             "D": 24,
-            "E": 30,
-            "F": 30,
-            "G": 18,
-            "H": 42,
-            "I": 30,
-            "J": 22,
-            "K": 22,
-            "L": 48,
+            "E": 18,
+            "F": 42,
+            "G": 30,
+            "H": 22,
+            "I": 22,
+            "J": 48,
         }
         for column, width in widths.items():
             sheet.column_dimensions[column].width = width
 
         if data.records:
-            severity_range = f"J2:J{end_row}"
+            severity_range = f"H2:H{end_row}"
             sheet.conditional_formatting.add(
                 severity_range,
                 FormulaRule(
-                    formula=['$J2="ERRO IMPEDITIVO"'],
+                    formula=['$H2="ERRO IMPEDITIVO"'],
                     fill=_fill("F4CCCC"),
                     font=Font(bold=True, color="9C0006"),
                 ),
             )
-            status_range = f"K2:K{end_row}"
+            status_range = f"I2:I{end_row}"
             sheet.conditional_formatting.add(
                 status_range,
                 FormulaRule(
-                    formula=['$K2="REPROVADA"'],
+                    formula=['$I2="REPROVADA"'],
                     fill=_fill("F4CCCC"),
                     font=Font(bold=True, color="9C0006"),
                 ),
@@ -314,7 +308,7 @@ class XlsxReportWriter:
             sheet.conditional_formatting.add(
                 status_range,
                 FormulaRule(
-                    formula=['$K2="REGRA NÃO EXECUTADA"'],
+                    formula=['$I2="REGRA NÃO EXECUTADA"'],
                     fill=_fill("E4DFEC"),
                     font=Font(color="5F497A"),
                 ),
@@ -322,7 +316,7 @@ class XlsxReportWriter:
             sheet.conditional_formatting.add(
                 severity_range,
                 FormulaRule(
-                    formula=['$J2="ERRO"'],
+                    formula=['$H2="ERRO"'],
                     fill=_fill("FCE5CD"),
                     font=Font(color="9C5700"),
                 ),
@@ -330,7 +324,7 @@ class XlsxReportWriter:
             sheet.conditional_formatting.add(
                 severity_range,
                 FormulaRule(
-                    formula=['$J2="AVISO"'],
+                    formula=['$H2="AVISO"'],
                     fill=_fill("FFF2CC"),
                     font=Font(color="7F6000"),
                 ),

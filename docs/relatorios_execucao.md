@@ -48,15 +48,13 @@ ENVIO`.
 
 ### Ocorrencias
 
-Apresenta estas 12 colunas:
+Apresenta estas 10 colunas:
 
 ```text
 Etapa
 Linha
 idEvento
 Coluna
-Valor Original
-Valor Normalizado
 Regra
 Descrição da Regra
 Origem

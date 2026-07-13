@@ -83,6 +83,45 @@ class EventGrouper:
         grouped_rows: dict[str, list[NormalizedBaseRow]] = {}
         ungrouped_rows: list[int] = []
         global_results: list[EventRuleResult] = []
+        collisions = self._find_normalized_id_collisions(
+            normalization.rows
+        )
+
+        for normalized_id, originals in collisions.items():
+            row_numbers = tuple(sorted(
+                row_number
+                for rows in originals.values()
+                for row_number in rows
+            ))
+            original_values = tuple(originals)
+            global_results.append(
+                EventRuleResult(
+                    code='MAP-EVT-ID-COLISAO-001',
+                    description=(
+                        'Proibir colisões após a normalização do idEvento.'
+                    ),
+                    source='Regra interna de agrupamento',
+                    severity=SEVERITY_BLOCKING_ERROR,
+                    status=RuleExecutionStatus.FAILED,
+                    id_evento=normalized_id,
+                    row_numbers=row_numbers,
+                    columns=('idEvento',),
+                    message=(
+                        'Identificadores originais distintos resultaram no '
+                        'mesmo idEvento normalizado: '
+                        f'{normalized_id}. Originais: '
+                        f'{", ".join(original_values)}.'
+                    ),
+                    suggestion=(
+                        'Corrigir os identificadores na planilha para que '
+                        'cada evento possua um idEvento normalizado único.'
+                    ),
+                    values=(
+                        ('idEvento normalizado', normalized_id),
+                        ('idEventos originais', original_values),
+                    ),
+                )
+            )
 
         for row in normalization.rows:
             if (
@@ -114,6 +153,10 @@ class EventGrouper:
                 )
                 continue
 
+            if row.id_evento in collisions:
+                ungrouped_rows.append(row.row_number)
+                continue
+
             grouped_rows.setdefault(row.id_evento, []).append(row)
 
         events: list[GroupedEvent] = []
@@ -134,6 +177,39 @@ class EventGrouper:
             ungrouped_row_numbers=tuple(ungrouped_rows),
             rule_results=tuple(global_results),
         )
+
+    @staticmethod
+    def _find_normalized_id_collisions(
+        rows: tuple[NormalizedBaseRow, ...],
+    ) -> dict[str, dict[str, tuple[int, ...]]]:
+        """Localiza origens distintas que convergem para o mesmo ID."""
+
+        origins_by_id: dict[str, dict[str, list[int]]] = defaultdict(
+            lambda: defaultdict(list)
+        )
+        for row in rows:
+            field = row.get_field('idEvento')
+            if field.is_invalid or field.is_absent or not row.id_evento:
+                continue
+
+            original = field.original_value
+            original_text = (
+                original.strip()
+                if isinstance(original, str)
+                else str(original)
+            )
+            origins_by_id[row.id_evento][original_text].append(
+                row.row_number
+            )
+
+        return {
+            normalized_id: {
+                original: tuple(row_numbers)
+                for original, row_numbers in originals.items()
+            }
+            for normalized_id, originals in origins_by_id.items()
+            if len(originals) > 1
+        }
 
     def _build_event(
         self,

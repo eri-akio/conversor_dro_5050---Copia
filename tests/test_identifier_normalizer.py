@@ -52,18 +52,55 @@ def test_invalid_bacen_ids(
     assert result.is_invalid
 
 
-def test_event_id_preserves_valid_text() -> None:
-    result = normalize_event_id("ORLD0001")
+@pytest.mark.parametrize(
+    ("raw_value", "expected"),
+    [
+        ("IND-0001", "IND0001"),
+        ("ORLD-1234", "ORLD1234"),
+        ("ABC-12-XYZ", "ABC12XYZ"),
+        ("IND0001", "IND0001"),
+    ],
+)
+def test_event_id_removes_only_safe_hyphen_separators(
+    raw_value: str,
+    expected: str,
+) -> None:
+    result = normalize_event_id(raw_value)
 
     assert result.is_valid
-    assert result.normalized_value == "ORLD0001"
+    assert result.original_value == raw_value
+    assert result.normalized_value == expected
+    assert result.serialized_value == expected
+    assert result.changed is (raw_value != expected)
 
 
-def test_event_id_with_hyphen_is_not_silently_changed() -> None:
-    result = normalize_event_id("ORLD-1234")
+@pytest.mark.parametrize(
+    "raw_value",
+    [
+        "-IND0001",
+        "IND0001-",
+        "IND--0001",
+        "IND@0001",
+        "---",
+    ],
+)
+def test_event_id_rejects_unsafe_or_invalid_separators(
+    raw_value: str,
+) -> None:
+    result = normalize_event_id(raw_value)
 
     assert result.is_invalid
     assert result.issue_code == "ID-EVENTO-FMT-001"
+
+
+def test_event_id_length_is_checked_after_separator_removal() -> None:
+    valid = normalize_event_id(f"{'A' * 20}-{'B' * 20}")
+    invalid = normalize_event_id(f"{'A' * 20}-{'B' * 21}")
+
+    assert valid.is_valid
+    assert len(valid.serialized_value or "") == 40
+    assert invalid.is_invalid
+    assert invalid.issue_code == "ID-EVENTO-TAMANHO-001"
 
 
 def test_identifier_numeric_value_is_rejected() -> None:

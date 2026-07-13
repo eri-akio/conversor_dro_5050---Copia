@@ -37,9 +37,12 @@ def _audited_workbook(path: Path) -> Path:
     )
     rows = (
         make_row(
-            event_id="IND0001",
+            event_id="IND-0001",
             category="4",
-            overrides={"probabilidadePerda": "PO"},
+            overrides={
+                "probabilidadePerda": "PO",
+                "codigoEventoOrigem": "ORIGIND001",
+            },
         ),
         *consolidated_one_rows,
         make_row(
@@ -144,6 +147,22 @@ def test_audited_xlsx_to_xsd_and_report_chain(tmp_path: Path) -> None:
     assert result.status_dependencias == DependentValidationStatus.PENDING
     assert result.general_status == GeneralValidationStatus.PENDING
     assert result.status == FinalExecutionStatus.NOT_APT
+
+    id_normalization_records = [
+        record
+        for record in report_result.data.records
+        if record.rule_code == "NORM-ID-EVENTO-001"
+        and record.id_evento is None
+    ]
+    assert len(id_normalization_records) == 1
+    id_normalization = id_normalization_records[0]
+    assert id_normalization.severity == "INFORMAÇÃO"
+    assert id_normalization.status == "NORMALIZADO"
+    assert id_normalization.original_value == "IND-0001"
+    assert id_normalization.normalized_value == "IND0001"
+    assert id_normalization.message == (
+        "Separadores permitidos foram removidos do idEvento."
+    )
 
     xml_path = result.artifacts.xml_path
     report_path = result.artifacts.xlsx_path

@@ -17,6 +17,19 @@ resolvido e é registrado:
 MAP-EVT-001 — ERRO IMPEDITIVO
 ```
 
+Antes de agrupar, o sistema também compara os valores originais de
+`idEvento`. Se dois originais distintos resultarem no mesmo identificador
+normalizado, todas as linhas envolvidas permanecem sem agrupamento e é
+registrado:
+
+```text
+MAP-EVT-ID-COLISAO-001 — ERRO IMPEDITIVO
+```
+
+Repetições do mesmo original são permitidas. Assim, várias ocorrências de
+`IND-0001` formam normalmente o evento `IND0001`, enquanto `IND-0001` e
+`IND0001` caracterizam colisão.
+
 ## 2. Atributos comparados
 
 São comparados entre as linhas do mesmo evento:
