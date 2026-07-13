@@ -7,7 +7,6 @@ import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
 from typing import Any
 
-from src.config import PROJECT_NAME
 from src.domain.conversion import ConversionResult
 from src.gui.controller import GuiController
 from src.gui.models import (
@@ -29,6 +28,9 @@ STATUS_AWAITING = "Aguardando"
 STATUS_PROCESSING = "Processando..."
 STATUS_COMPLETED = "Concluído"
 STATUS_TECHNICAL_FAILURE = "Falha técnica"
+PATH_ENTRY_WIDTH = 62
+SELECT_BUTTON_WIDTH = 16
+ACTION_BUTTON_WIDTH = 38
 
 
 class Dro5050Application(ttk.Frame):
@@ -69,9 +71,9 @@ class Dro5050Application(ttk.Frame):
         )
 
     def _configure_window(self) -> None:
-        self.master.title(PROJECT_NAME)
-        self.master.geometry("980x360")
-        self.master.minsize(760, 320)
+        self.master.title("Smart Reporting")
+        self.master.geometry("720x430")
+        self.master.minsize(720, 430)
         self.master.columnconfigure(0, weight=1)
         self.master.rowconfigure(0, weight=1)
 
@@ -123,12 +125,11 @@ class Dro5050Application(ttk.Frame):
     def _build_title(self) -> None:
         ttk.Label(
             self,
-            text="Conversor XLSX → XML DRO 5050",
+            text="Smart Reporting - CADOC 5050",
             style="Title.TLabel",
         ).grid(
             row=0,
             column=0,
-            sticky="w",
             pady=(0, 18),
         )
 
@@ -140,8 +141,6 @@ class Dro5050Application(ttk.Frame):
             sticky="ew",
             pady=(0, 4),
         )
-        frame.columnconfigure(1, weight=1)
-
         ttk.Label(
             frame,
             text="Planilha Excel:",
@@ -156,18 +155,19 @@ class Dro5050Application(ttk.Frame):
         self.excel_entry = ttk.Entry(
             frame,
             textvariable=self.excel_var,
+            width=PATH_ENTRY_WIDTH,
         )
         self.excel_entry.grid(
             row=0,
             column=1,
-            sticky="ew",
             pady=4,
         )
 
         self.browse_excel_button = ttk.Button(
             frame,
-            text="Selecionar...",
+            text="Selecionar",
             command=self._browse_excel,
+            width=SELECT_BUTTON_WIDTH,
         )
         self.browse_excel_button.grid(
             row=0,
@@ -190,18 +190,19 @@ class Dro5050Application(ttk.Frame):
         self.output_entry = ttk.Entry(
             frame,
             textvariable=self.output_root_var,
+            width=PATH_ENTRY_WIDTH,
         )
         self.output_entry.grid(
             row=1,
             column=1,
-            sticky="ew",
             pady=4,
         )
 
         self.browse_output_button = ttk.Button(
             frame,
-            text="Selecionar...",
+            text="Selecionar",
             command=self._browse_output,
+            width=SELECT_BUTTON_WIDTH,
         )
         self.browse_output_button.grid(
             row=1,
@@ -253,39 +254,42 @@ class Dro5050Application(ttk.Frame):
             pady=(8, 0),
         )
         action_frame.columnconfigure(0, weight=1)
-        action_frame.columnconfigure(4, weight=1)
+        action_frame.columnconfigure(2, weight=1)
 
         self.convert_button = ttk.Button(
             action_frame,
             text="Converter, validar e gerar XML/XLSX",
             command=self._start_conversion,
             style="Primary.TButton",
+            width=ACTION_BUTTON_WIDTH,
         )
         self.convert_button.grid(
             row=0,
             column=1,
-            padx=(0, 8),
+            pady=(0, 8),
         )
         self.artifact_buttons = {
             "xml": ttk.Button(
                 action_frame,
                 text="Abrir XML",
                 command=lambda: self._open_artifact("xml"),
+                width=ACTION_BUTTON_WIDTH,
             ),
             "xlsx": ttk.Button(
                 action_frame,
                 text="Abrir relatório XLSX",
                 command=lambda: self._open_artifact("xlsx"),
+                width=ACTION_BUTTON_WIDTH,
             ),
         }
         self.artifact_buttons["xml"].grid(
-            row=0,
-            column=2,
-            padx=(0, 8),
+            row=1,
+            column=1,
+            pady=(0, 8),
         )
         self.artifact_buttons["xlsx"].grid(
-            row=0,
-            column=3,
+            row=2,
+            column=1,
         )
 
     def _browse_excel(self) -> None:

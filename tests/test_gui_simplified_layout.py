@@ -21,7 +21,8 @@ def test_layout_contains_only_requested_controls() -> None:
     source = _source()
 
     for text in (
-        "Conversor XLSX → XML DRO 5050",
+        'self.master.title("Smart Reporting")',
+        "Smart Reporting - CADOC 5050",
         "Planilha Excel:",
         "Pasta de saída:",
         "Status:",
@@ -31,6 +32,35 @@ def test_layout_contains_only_requested_controls() -> None:
         "Abrir pasta",
     ):
         assert text in source
+
+
+def test_path_and_action_controls_use_the_requested_proportions() -> None:
+    source = _source()
+
+    assert "PATH_ENTRY_WIDTH = 62" in source
+    assert source.count("width=PATH_ENTRY_WIDTH") == 2
+    assert "SELECT_BUTTON_WIDTH = 16" in source
+    assert source.count("width=SELECT_BUTTON_WIDTH") == 2
+    assert "ACTION_BUTTON_WIDTH = 38" in source
+    assert source.count("width=ACTION_BUTTON_WIDTH") == 3
+    assert source.count('text="Selecionar"') == 2
+
+
+def test_action_buttons_are_centered_in_a_vertical_column() -> None:
+    source = _source()
+    action_layout = source.split(
+        "action_frame = ttk.Frame(frame)",
+        maxsplit=1,
+    )[1].split(
+        "def _browse_excel",
+        maxsplit=1,
+    )[0]
+
+    assert "action_frame.columnconfigure(0, weight=1)" in action_layout
+    assert "action_frame.columnconfigure(2, weight=1)" in action_layout
+    assert "self.convert_button.grid(\n            row=0,\n            column=1," in action_layout
+    assert 'self.artifact_buttons["xml"].grid(\n            row=1,\n            column=1,' in action_layout
+    assert 'self.artifact_buttons["xlsx"].grid(\n            row=2,\n            column=1,' in action_layout
 
 
 def test_subtitle_numbered_sections_and_message_area_were_removed() -> None:
