@@ -8,6 +8,7 @@ from pathlib import Path
 
 from defusedxml import ElementTree
 from openpyxl import load_workbook
+import pytest
 
 from src.domain.conversion import ConversionStage
 from src.domain.event_classification import EventDestination
@@ -24,7 +25,11 @@ from src.services import convert_excel
 from .workbook_factory import create_workbook, make_row
 
 
-def _audited_workbook(path: Path) -> Path:
+def _audited_workbook(
+    path: Path,
+    *,
+    embedded_references: bool = False,
+) -> Path:
     consolidated_one_rows = tuple(
         make_row(
             event_id="CONS0001",
@@ -72,11 +77,26 @@ def _audited_workbook(path: Path) -> Path:
         ),
     )
     assert len(rows) == 9
-    return create_workbook(path, rows=rows, data_base="2026-06")
+    return create_workbook(
+        path,
+        rows=rows,
+        data_base="2026-06",
+        embedded_references=embedded_references,
+    )
 
 
-def test_audited_xlsx_to_xsd_and_report_chain(tmp_path: Path) -> None:
-    input_path = _audited_workbook(tmp_path / "entrada_auditada.xlsx")
+@pytest.mark.parametrize(
+    "embedded_references",
+    (False, True),
+)
+def test_audited_xlsx_to_xsd_and_report_chain(
+    tmp_path: Path,
+    embedded_references: bool,
+) -> None:
+    input_path = _audited_workbook(
+        tmp_path / "entrada_auditada.xlsx",
+        embedded_references=embedded_references,
+    )
     output_dir = tmp_path / "saida"
 
     result = convert_excel(input_path, output_dir=output_dir)
@@ -90,12 +110,13 @@ def test_audited_xlsx_to_xsd_and_report_chain(tmp_path: Path) -> None:
     xsd = result.output(ConversionStage.VALIDATE_XSD)
     report_result = result.output(ConversionStage.GENERATE_REPORTS)
 
-    assert set(excel.sheets) == {
-        "Base",
-        "Cabecalho",
-        "Sistemas_Origem",
-        "Contas_Internas",
-    }
+    expected_sheets = {"Base", "Cabecalho"}
+    if not embedded_references:
+        expected_sheets.update({
+            "Sistemas_Origem",
+            "Contas_Internas",
+        })
+    assert set(excel.sheets) == expected_sheets
     assert len(normalization.rows) == 9
     assert normalization.rows[0].get_field("totalPerdaEfetiva").is_valid
     assert len(grouping.events) == 6

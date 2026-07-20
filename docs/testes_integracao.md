@@ -18,7 +18,7 @@ Excel -> leitura -> normalização -> domínio -> agrupamento
 
 | Arquivo | Responsabilidade |
 | --- | --- |
-| `workbook_factory.py` | Cria as quatro abas obrigatórias, valores tipados, referências e fórmulas com ou sem resultado em cache. |
+| `workbook_factory.py` | Cria tanto o formato legado de quatro abas quanto o formato de duas abas com referências embutidas, além de valores tipados e fórmulas com ou sem resultado em cache. |
 | `test_excel_to_domain.py` | Verifica datas, decimais, rastreabilidade de linhas, formatos monetários, domínios inválidos e política de fórmulas. |
 | `test_grouping_and_consolidation.py` | Verifica agrupamento, conflito de atributos, roteamento exclusivo, semestre e reconciliação de regras adiadas. |
 | `test_xml_xsd_pipeline.py` | Verifica blocos individualizado e consolidado, aliases XML, serialização monetária, versão do esquema e rejeição de XML inválido. |
@@ -42,6 +42,8 @@ Excel -> leitura -> normalização -> domínio -> agrupamento
   dependências não estão disponíveis;
 - falha de leitura classificada como falha técnica;
 - saída plana contendo somente XML e relatório Excel, sem `logs` e sem TXT.
+- equivalência do XML para referências em abas próprias ou embutidas na
+  `Base`.
 
 ## Critérios de segurança dos testes
 
@@ -69,6 +71,5 @@ Regressão completa:
 python -m pytest -q
 ```
 
-Na conclusão desta etapa, o resultado de referência foi de **423 testes
-aprovados**, dos quais **22 são testes de integração programáticos**.
-
+A quantidade de testes deve ser obtida na execução atual da suíte; este
+documento não mantém um total fixo que possa ficar desatualizado.

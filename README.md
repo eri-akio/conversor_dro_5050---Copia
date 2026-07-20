@@ -7,6 +7,19 @@ relatórios.
 > Situação atual: **Etapa 6.1 — interface desktop simplificada com
 > Tkinter/ttk**.
 
+## Formatos de entrada
+
+O formato principal possui somente:
+
+```text
+Base
+Cabecalho
+```
+
+Os nomes dos sistemas e das contas internas ficam na própria `Base`. O
+formato legado com as abas `Sistemas_Origem` e `Contas_Internas` permanece
+compatível; quando utilizadas, as duas abas devem existir juntas.
+
 ## Interface gráfica
 
 Abra a aplicação com:

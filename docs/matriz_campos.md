@@ -3,13 +3,22 @@
 **Projeto:** Conversor XLSX → XML DRO 5050  
 **Arquivo:** `docs/matriz_campos.md`  
 **Etapa:** 1.2 — Matriz de campos  
-**Objetivo:** documentar, antes da programação, como cada coluna das quatro abas de entrada será lida, normalizada, validada, agrupada e convertida para o XML.
+**Objetivo:** documentar como cada coluna das abas de entrada será lida, normalizada, validada, agrupada e convertida para o XML.
 
 ---
 
 ## 1. Escopo do arquivo de entrada
 
-O conversor produtivo deverá considerar somente estas quatro abas:
+O contrato atual aceita dois formatos.
+
+Formato principal:
+
+```text
+Base
+Cabecalho
+```
+
+Formato legado compatível:
 
 ```text
 Base
@@ -20,7 +29,8 @@ Contas_Internas
 
 Abas adicionais poderão existir, mas serão ignoradas.
 
-A ausência de qualquer uma das quatro abas obrigatórias deve resultar em:
+A ausência de `Base` ou `Cabecalho`, assim como a presença de somente uma das
+duas abas auxiliares, deve resultar em:
 
 ```text
 FALHA TÉCNICA
@@ -31,9 +41,14 @@ FALHA TÉCNICA
 | Aba | Responsabilidade |
 |---|---|
 | `Cabecalho` | Atributos do elemento raiz `<documento>` |
-| `Base` | Eventos, probabilidades, contabilizações e cálculo dos consolidados |
-| `Sistemas_Origem` | Tabela de códigos e nomes dos sistemas legados |
-| `Contas_Internas` | Tabela de códigos e nomes das contas internas |
+| `Base` | Eventos, probabilidades, contabilizações, referências embutidas e cálculo dos consolidados |
+| `Sistemas_Origem` | Tabela legada opcional de códigos e nomes dos sistemas |
+| `Contas_Internas` | Tabela legada opcional de códigos e nomes das contas internas |
+
+No formato de duas abas, os nomes das referências são informados em
+`nomeSistemaOrigem`, `nomeContaBalAnaliticoDebito` e
+`nomeContaBalAnaliticoCredito`. Pares repetidos de código e nome são
+deduplicados; o mesmo código com nomes diferentes é impeditivo.
 
 ### 1.2. Fonte dos eventos consolidados
 

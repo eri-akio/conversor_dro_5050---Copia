@@ -80,6 +80,9 @@ ensure_runtime_directories()
 REQUIRED_SHEETS = (
     "Base",
     "Cabecalho",
+)
+
+OPTIONAL_REFERENCE_SHEETS = (
     "Sistemas_Origem",
     "Contas_Internas",
 )
@@ -87,7 +90,17 @@ REQUIRED_SHEETS = (
 
 A grafia é exata.
 
-Abas adicionais serão permitidas, mas essas quatro deverão existir.
+`Base` e `Cabecalho` sempre deverão existir. As duas abas de referência são
+opcionais como conjunto: ou ambas estão presentes, preservando o leiaute
+legado, ou ambas estão ausentes e seus dados são informados na `Base`.
+
+No formato de duas abas, a `Base` também contém:
+
+```text
+nomeSistemaOrigem
+nomeContaBalAnaliticoDebito
+nomeContaBalAnaliticoCredito
+```
 
 ---
 

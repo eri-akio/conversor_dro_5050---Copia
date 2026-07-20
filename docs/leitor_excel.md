@@ -16,8 +16,9 @@ Ele:
 - verifica se o arquivo existe;
 - rejeita arquivo temporário `~$...xlsx`;
 - detecta arquivo inválido ou corrompido;
-- confirma as quatro abas obrigatórias;
-- lê somente as abas produtivas;
+- confirma `Base` e `Cabecalho`;
+- carrega as duas abas auxiliares quando ambas estão presentes;
+- rejeita o formato parcial com apenas uma aba auxiliar;
 - informa as abas adicionais;
 - preserva linhas, fórmulas e formatação básica;
 - ignora linhas completamente vazias;
@@ -35,14 +36,40 @@ Ele ainda não:
 
 ---
 
-## 2. Abas obrigatórias
+## 2. Abas reconhecidas
+
+Obrigatórias:
 
 ```text
 Base
 Cabecalho
+```
+
+Opcionais em conjunto, para compatibilidade com o leiaute legado:
+
+```text
 Sistemas_Origem
 Contas_Internas
 ```
+
+Sem as abas opcionais, sistemas e contas são extraídos das colunas de
+referência embutidas na `Base`.
+
+Os aliases posicionais do modelo operacional também são resolvidos:
+
+```text
+codSistemaOrigem | nomeSistema
+    -> nomeSistemaOrigem
+
+contaBalAnaliticoDebito | nomeConta
+    -> nomeContaBalAnaliticoDebito
+
+contaBalAnaliticoCredito | nomeConta
+    -> nomeContaBalAnaliticoCredito
+```
+
+Fora dessas posições inequívocas, cabeçalhos duplicados continuam sendo
+rejeitados.
 
 Abas adicionais são permitidas e ficam registradas em:
 
@@ -105,7 +132,7 @@ Contém:
 ```text
 caminho do arquivo
 tamanho do arquivo
-quatro abas lidas
+abas reconhecidas e carregadas
 abas adicionais
 total de linhas
 total de fórmulas

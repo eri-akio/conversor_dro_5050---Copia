@@ -12,11 +12,11 @@ src/domain/reference_tables.py
 
 ## 1. Objetivo
 
-Ler e validar as abas:
+Ler e validar sistemas e contas internas a partir de uma das duas origens:
 
 ```text
-Sistemas_Origem
-Contas_Internas
+formato legado: Sistemas_Origem + Contas_Internas
+formato atual: colunas embutidas na Base
 ```
 
 Essas abas alimentam os blocos XML:
@@ -30,6 +30,23 @@ Também são verificadas as referências utilizadas nos eventos e nas
 contabilizações.
 
 ## 2. Estrutura esperada
+
+### Referências embutidas na `Base`
+
+```text
+codSistemaOrigem
+nomeSistemaOrigem
+contaBalAnaliticoDebito
+nomeContaBalAnaliticoDebito
+contaBalAnaliticoCredito
+nomeContaBalAnaliticoCredito
+```
+
+Os aliases `nomeSistema` e `nomeConta` do modelo operacional são aceitos
+somente quando a posição deixa claro o campo de destino. Internamente eles
+são convertidos para nomes únicos antes da criação de `RawRow`.
+
+### Abas legadas
 
 ### `Sistemas_Origem`
 
@@ -103,7 +120,10 @@ DRO001102 — unicidade de codigoSistema
 DRO001101 — unicidade de codigoConta
 ```
 
-Código repetido é erro, mesmo quando o nome também é igual.
+Nas abas legadas, código repetido é erro, mesmo quando o nome também é igual.
+
+Na `Base`, a repetição do mesmo par código e nome é esperada e é deduplicada.
+O mesmo código associado a nomes diferentes continua sendo erro.
 
 Quando o mesmo código possui nomes diferentes, o sistema não escolhe um deles.
 
@@ -112,9 +132,9 @@ Quando o mesmo código possui nomes diferentes, o sistema não escolhe um deles.
 Após o agrupamento dos eventos são executadas:
 
 ```text
-DRO001321 — codSistemaOrigem deve existir em codigoSistema
-DRO001401 — contaBalAnaliticoDebito deve existir em codigoConta
-DRO001402 — contaBalAnaliticoCredito deve existir em codigoConta
+DRO001321 — codSistemaOrigem deve possuir nome único e válido
+DRO001401 — contaBalAnaliticoDebito deve possuir nome único e válido
+DRO001402 — contaBalAnaliticoCredito deve possuir nome único e válido
 ```
 
 A regra de sistema é avaliada uma vez por evento lógico.

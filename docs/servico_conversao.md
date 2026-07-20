@@ -20,7 +20,7 @@ apresentam o resultado.
 ```text
 Excel
   ↓
-leitura das quatro abas produtivas
+leitura de `Base` e `Cabecalho`, com referências separadas ou embutidas
   ↓
 leitura, validação e normalização do cabeçalho
   ↓

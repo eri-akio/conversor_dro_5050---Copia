@@ -12,6 +12,10 @@ Contratos por versão:
 - ``DRO_2026_12_PRESUMIDA``:
   exige as 35 colunas, embora o perfil continue bloqueado para APTO
   pela incompatibilidade documental registrada.
+
+Quando as referências não estão em abas próprias, três colunas de nomes
+também são obrigatórias na ``Base``. Elas são opcionais no formato legado
+de quatro abas.
 """
 
 from __future__ import annotations
@@ -22,9 +26,11 @@ from typing import Any
 from src.config import (
     BASE_ALL_COLUMNS,
     BASE_CONFIRMED_REQUIRED_COLUMNS,
+    BASE_EMBEDDED_REFERENCE_COLUMNS,
     BASE_FUTURE_COLUMNS,
     BASE_KNOWN_COLUMN_ALIASES,
     BASE_METADATA_COLUMNS,
+    OPTIONAL_REFERENCE_SHEETS,
     SHEET_BASE,
 )
 from src.domain.regulatory_version import RegulatoryVersion
@@ -163,7 +169,14 @@ class BaseStructureValidator:
         """Executa a validação estrutural sem alterar a planilha."""
 
         sheet = excel_result.get_sheet(SHEET_BASE)
-        contract = self._contract_for_profile(profile)
+        embedded_references = not all(
+            sheet_name in excel_result.sheets
+            for sheet_name in OPTIONAL_REFERENCE_SHEETS
+        )
+        contract = self._contract_for_profile(
+            profile,
+            embedded_references=embedded_references,
+        )
 
         actual_columns = sheet.headers
         missing_columns = tuple(
@@ -281,24 +294,45 @@ class BaseStructureValidator:
     @staticmethod
     def _contract_for_profile(
         profile: RegulatoryVersion,
+        *,
+        embedded_references: bool = False,
     ) -> BaseColumnContract:
         """Monta o contrato sem misturar obrigatoriedade de células."""
+
+        reference_required = (
+            BASE_EMBEDDED_REFERENCE_COLUMNS
+            if embedded_references
+            else ()
+        )
+        reference_optional = (
+            ()
+            if embedded_references
+            else BASE_EMBEDDED_REFERENCE_COLUMNS
+        )
 
         if profile.code in LEGACY_PROFILE_CODES:
             return BaseColumnContract(
                 profile_code=profile.code,
                 required_columns=(
-                    BASE_CONFIRMED_REQUIRED_COLUMNS
+                    *BASE_CONFIRMED_REQUIRED_COLUMNS,
+                    *reference_required,
                 ),
-                optional_columns=BASE_FUTURE_COLUMNS,
+                optional_columns=(
+                    *BASE_FUTURE_COLUMNS,
+                    *reference_optional,
+                ),
                 recognized_columns=BASE_ALL_COLUMNS,
             )
 
         if profile.code in FUTURE_PROFILE_CODES:
             return BaseColumnContract(
                 profile_code=profile.code,
-                required_columns=BASE_ALL_COLUMNS,
-                optional_columns=(),
+                required_columns=(
+                    *BASE_CONFIRMED_REQUIRED_COLUMNS,
+                    *BASE_FUTURE_COLUMNS,
+                    *reference_required,
+                ),
+                optional_columns=reference_optional,
                 recognized_columns=BASE_ALL_COLUMNS,
             )
 

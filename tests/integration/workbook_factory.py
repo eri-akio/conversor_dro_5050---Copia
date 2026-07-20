@@ -10,7 +10,12 @@ from zipfile import ZIP_DEFLATED, ZipFile
 
 from openpyxl import Workbook, load_workbook
 
-from src.config import BASE_ALL_COLUMNS
+from src.config import (
+    BASE_ALL_COLUMNS,
+    BASE_CREDIT_ACCOUNT_NAME_COLUMN,
+    BASE_DEBIT_ACCOUNT_NAME_COLUMN,
+    BASE_SOURCE_SYSTEM_NAME_COLUMN,
+)
 
 
 DEBIT_ACCOUNT = "810000000000000000000001"
@@ -100,13 +105,25 @@ def create_workbook(
     data_base: str = "2026-06",
     systems: Iterable[str] = (SOURCE_SYSTEM,),
     accounts: Iterable[str] = (DEBIT_ACCOUNT, CREDIT_ACCOUNT),
+    embedded_references: bool = False,
 ) -> Path:
     workbook = Workbook()
     workbook.remove(workbook.active)
 
     base = workbook.create_sheet("Base")
     base.append(list(BASE_ALL_COLUMNS))
-    for row_values in rows:
+    for source_values in rows:
+        row_values = dict(source_values)
+        if embedded_references:
+            row_values[BASE_SOURCE_SYSTEM_NAME_COLUMN] = (
+                f"Sistema {row_values['codSistemaOrigem']}"
+            )
+            row_values[BASE_DEBIT_ACCOUNT_NAME_COLUMN] = (
+                f"Conta {row_values['contaBalAnaliticoDebito']}"
+            )
+            row_values[BASE_CREDIT_ACCOUNT_NAME_COLUMN] = (
+                f"Conta {row_values['contaBalAnaliticoCredito']}"
+            )
         base.append([
             row_values.get(column_name)
             for column_name in BASE_ALL_COLUMNS
@@ -148,17 +165,24 @@ def create_workbook(
     for cell in header[2]:
         cell.number_format = "@"
 
-    systems_sheet = workbook.create_sheet("Sistemas_Origem")
-    systems_sheet.append(["codigoSistema", "nomeSistema"])
-    for code in systems:
-        systems_sheet.append([code, f"Sistema {code}"])
-        systems_sheet.cell(systems_sheet.max_row, 1).number_format = "@"
+    if not embedded_references:
+        systems_sheet = workbook.create_sheet("Sistemas_Origem")
+        systems_sheet.append(["codigoSistema", "nomeSistema"])
+        for code in systems:
+            systems_sheet.append([code, f"Sistema {code}"])
+            systems_sheet.cell(
+                systems_sheet.max_row,
+                1,
+            ).number_format = "@"
 
-    accounts_sheet = workbook.create_sheet("Contas_Internas")
-    accounts_sheet.append(["codigoConta", "nomeConta"])
-    for code in accounts:
-        accounts_sheet.append([code, f"Conta {code}"])
-        accounts_sheet.cell(accounts_sheet.max_row, 1).number_format = "@"
+        accounts_sheet = workbook.create_sheet("Contas_Internas")
+        accounts_sheet.append(["codigoConta", "nomeConta"])
+        for code in accounts:
+            accounts_sheet.append([code, f"Conta {code}"])
+            accounts_sheet.cell(
+                accounts_sheet.max_row,
+                1,
+            ).number_format = "@"
 
     workbook.save(destination)
     workbook.close()

@@ -7,7 +7,10 @@ from typing import TYPE_CHECKING, Any, Callable
 
 from src.config import (
     BASE_ALL_COLUMNS,
+    BASE_CREDIT_ACCOUNT_NAME_COLUMN,
+    BASE_DEBIT_ACCOUNT_NAME_COLUMN,
     BASE_FUTURE_COLUMNS,
+    BASE_SOURCE_SYSTEM_NAME_COLUMN,
 )
 from src.domain.base_row import (
     BaseRowIssue,
@@ -35,6 +38,9 @@ from src.normalizers.identifier_normalizer import (
     normalize_source_system_code,
 )
 from src.normalizers.null_normalizer import is_null_candidate
+from src.normalizers.reference_table_normalizer import (
+    normalize_reference_name,
+)
 from src.normalizers.text_normalizer import normalize_text
 if TYPE_CHECKING:
     from src.readers.excel_reader import RawCell, RawRow
@@ -423,6 +429,14 @@ class BaseRowNormalizer:
             "codSistemaOrigem": (
                 lambda: normalize_source_system_code(value)
             ),
+            BASE_SOURCE_SYSTEM_NAME_COLUMN: (
+                lambda: normalize_reference_name(
+                    value,
+                    field_label=(
+                        BASE_SOURCE_SYSTEM_NAME_COLUMN
+                    ),
+                )
+            ),
             "codigoEventoOrigem": (
                 lambda: normalize_origin_event_code(value)
             ),
@@ -476,6 +490,22 @@ class BaseRowNormalizer:
             "contaBalAnaliticoCredito": (
                 lambda: normalize_internal_account_code(
                     value
+                )
+            ),
+            BASE_DEBIT_ACCOUNT_NAME_COLUMN: (
+                lambda: normalize_reference_name(
+                    value,
+                    field_label=(
+                        BASE_DEBIT_ACCOUNT_NAME_COLUMN
+                    ),
+                )
+            ),
+            BASE_CREDIT_ACCOUNT_NAME_COLUMN: (
+                lambda: normalize_reference_name(
+                    value,
+                    field_label=(
+                        BASE_CREDIT_ACCOUNT_NAME_COLUMN
+                    ),
                 )
             ),
             "contaCosifDebito": (

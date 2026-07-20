@@ -8,6 +8,7 @@ from src.config import (
     BASE_ACCOUNTING_COLUMNS,
     BASE_ALL_COLUMNS,
     BASE_CONFIRMED_REQUIRED_COLUMNS,
+    BASE_EMBEDDED_REFERENCE_COLUMNS,
     BASE_EVENT_COLUMNS,
     BASE_FUTURE_COLUMNS,
     BASE_KNOWN_COLUMN_ALIASES,
@@ -24,6 +25,7 @@ from src.config import (
     INTERNAL_ACCOUNT_NAME_COLUMN,
     INTERNAL_ACCOUNT_CODE_COLUMN,
     OPTIONAL_HEADER_COLUMNS,
+    OPTIONAL_REFERENCE_SHEETS,
     PRE_PROCESSING_CRITICS_PATH,
     POST_PROCESSING_CRITICS_PATH,
     OUTPUT_DIR,
@@ -62,8 +64,14 @@ def test_required_sheet_names_are_exact() -> None:
     assert REQUIRED_SHEETS == (
         "Base",
         "Cabecalho",
+    )
+    assert OPTIONAL_REFERENCE_SHEETS == (
         "Sistemas_Origem",
         "Contas_Internas",
+    )
+    assert (
+        SETTINGS.optional_reference_sheets
+        == OPTIONAL_REFERENCE_SHEETS
     )
 
 
@@ -104,8 +112,13 @@ def test_base_column_configuration() -> None:
         "motivoExclusao",
     )
     assert len(BASE_CONFIRMED_REQUIRED_COLUMNS) == 32
-    assert len(BASE_ALL_COLUMNS) == 35
-    assert len(set(BASE_ALL_COLUMNS)) == 35
+    assert BASE_EMBEDDED_REFERENCE_COLUMNS == (
+        "nomeSistemaOrigem",
+        "nomeContaBalAnaliticoDebito",
+        "nomeContaBalAnaliticoCredito",
+    )
+    assert len(BASE_ALL_COLUMNS) == 38
+    assert len(set(BASE_ALL_COLUMNS)) == 38
     assert (
         SETTINGS.base_confirmed_required_columns
         == BASE_CONFIRMED_REQUIRED_COLUMNS
@@ -113,6 +126,10 @@ def test_base_column_configuration() -> None:
     assert (
         SETTINGS.base_future_columns
         == BASE_FUTURE_COLUMNS
+    )
+    assert (
+        SETTINGS.base_embedded_reference_columns
+        == BASE_EMBEDDED_REFERENCE_COLUMNS
     )
     assert (
         BASE_KNOWN_COLUMN_ALIASES[

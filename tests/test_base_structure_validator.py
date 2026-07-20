@@ -9,6 +9,7 @@ from openpyxl import Workbook, load_workbook
 from src.config import (
     BASE_ALL_COLUMNS,
     BASE_CONFIRMED_REQUIRED_COLUMNS,
+    BASE_EMBEDDED_REFERENCE_COLUMNS,
     BASE_FUTURE_COLUMNS,
 )
 from src.readers.excel_reader import read_excel
@@ -23,6 +24,7 @@ def create_workbook(
     *,
     base_columns: tuple[str, ...],
     include_base_row: bool = True,
+    include_reference_sheets: bool = True,
 ) -> None:
     workbook = Workbook()
     default_sheet = workbook.active
@@ -64,13 +66,14 @@ def create_workbook(
         ]
     )
 
-    systems = workbook.create_sheet("Sistemas_Origem")
-    systems.append(["codigoSistema", "nomeSistema"])
-    systems.append(["SIS001", "Sistema"])
+    if include_reference_sheets:
+        systems = workbook.create_sheet("Sistemas_Origem")
+        systems.append(["codigoSistema", "nomeSistema"])
+        systems.append(["SIS001", "Sistema"])
 
-    accounts = workbook.create_sheet("Contas_Internas")
-    accounts.append(["codigoConta", "nomeConta"])
-    accounts.append(["0001", "Conta"])
+        accounts = workbook.create_sheet("Contas_Internas")
+        accounts.append(["codigoConta", "nomeConta"])
+        accounts.append(["0001", "Conta"])
 
     workbook.save(destination)
     workbook.close()
@@ -101,6 +104,50 @@ def test_legacy_profile_accepts_confirmed_columns(
     assert result.extra_columns == ()
     assert result.future_columns_present == ()
     assert result.row_count == 1
+
+
+def test_two_sheet_input_requires_embedded_reference_names(
+    tmp_path: Path,
+) -> None:
+    excel_path = tmp_path / "duas_abas_incompleto.xlsx"
+    create_workbook(
+        excel_path,
+        base_columns=BASE_CONFIRMED_REQUIRED_COLUMNS,
+        include_reference_sheets=False,
+    )
+
+    result = validate_base_structure(
+        read_excel(excel_path),
+        get_profile("2026-06"),
+    )
+
+    assert not result.is_valid
+    assert (
+        result.missing_columns
+        == BASE_EMBEDDED_REFERENCE_COLUMNS
+    )
+
+
+def test_two_sheet_input_accepts_embedded_reference_names(
+    tmp_path: Path,
+) -> None:
+    excel_path = tmp_path / "duas_abas_valido.xlsx"
+    create_workbook(
+        excel_path,
+        base_columns=(
+            *BASE_CONFIRMED_REQUIRED_COLUMNS,
+            *BASE_EMBEDDED_REFERENCE_COLUMNS,
+        ),
+        include_reference_sheets=False,
+    )
+
+    result = validate_base_structure(
+        read_excel(excel_path),
+        get_profile("2026-06"),
+    )
+
+    assert result.is_valid
+    assert result.missing_columns == ()
 
 
 def test_legacy_profile_accepts_future_columns_as_optional(

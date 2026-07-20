@@ -76,6 +76,9 @@ SHEET_INTERNAL_ACCOUNTS = "Contas_Internas"
 REQUIRED_SHEETS: tuple[str, ...] = (
     SHEET_BASE,
     SHEET_HEADER,
+)
+
+OPTIONAL_REFERENCE_SHEETS: tuple[str, ...] = (
     SHEET_SOURCE_SYSTEMS,
     SHEET_INTERNAL_ACCOUNTS,
 )
@@ -166,6 +169,20 @@ BASE_FUTURE_COLUMNS: tuple[str, ...] = (
     "motivoExclusao",
 )
 
+BASE_SOURCE_SYSTEM_NAME_COLUMN = "nomeSistemaOrigem"
+BASE_DEBIT_ACCOUNT_NAME_COLUMN = (
+    "nomeContaBalAnaliticoDebito"
+)
+BASE_CREDIT_ACCOUNT_NAME_COLUMN = (
+    "nomeContaBalAnaliticoCredito"
+)
+
+BASE_EMBEDDED_REFERENCE_COLUMNS: tuple[str, ...] = (
+    BASE_SOURCE_SYSTEM_NAME_COLUMN,
+    BASE_DEBIT_ACCOUNT_NAME_COLUMN,
+    BASE_CREDIT_ACCOUNT_NAME_COLUMN,
+)
+
 BASE_CONFIRMED_REQUIRED_COLUMNS: tuple[str, ...] = (
     *BASE_METADATA_COLUMNS,
     *BASE_EVENT_COLUMNS,
@@ -176,6 +193,7 @@ BASE_CONFIRMED_REQUIRED_COLUMNS: tuple[str, ...] = (
 BASE_ALL_COLUMNS: tuple[str, ...] = (
     *BASE_CONFIRMED_REQUIRED_COLUMNS,
     *BASE_FUTURE_COLUMNS,
+    *BASE_EMBEDDED_REFERENCE_COLUMNS,
 )
 
 BASE_KNOWN_COLUMN_ALIASES: dict[str, str] = {
@@ -347,6 +365,9 @@ class ProjectSettings:
         POST_PROCESSING_CRITICS_PATH
     )
     required_sheets: tuple[str, ...] = REQUIRED_SHEETS
+    optional_reference_sheets: tuple[str, ...] = (
+        OPTIONAL_REFERENCE_SHEETS
+    )
     required_header_columns: tuple[str, ...] = (
         REQUIRED_HEADER_COLUMNS
     )
@@ -355,6 +376,9 @@ class ProjectSettings:
     )
     base_future_columns: tuple[str, ...] = (
         BASE_FUTURE_COLUMNS
+    )
+    base_embedded_reference_columns: tuple[str, ...] = (
+        BASE_EMBEDDED_REFERENCE_COLUMNS
     )
     required_source_system_columns: tuple[str, ...] = (
         REQUIRED_SOURCE_SYSTEM_COLUMNS

@@ -1200,7 +1200,7 @@ class DocumentBuilder:
                             "registro único e válido."
                         ),
                         source=(
-                            "Tabela Sistemas_Origem"
+                            "Referências de sistemas de origem"
                         ),
                         blocks_xml=True,
                         blocks_apt=True,
@@ -1245,7 +1245,7 @@ class DocumentBuilder:
                             "Conta utilizada não possui "
                             "registro único e válido."
                         ),
-                        source="Tabela Contas_Internas",
+                        source="Referências de contas internas",
                         blocks_xml=True,
                         blocks_apt=True,
                         values=(

@@ -7,7 +7,10 @@ from pathlib import Path
 from openpyxl import Workbook
 import pytest
 
-from src.config import REQUIRED_SHEETS
+from src.config import (
+    OPTIONAL_REFERENCE_SHEETS,
+    REQUIRED_SHEETS,
+)
 from src.readers.excel_reader import (
     ExcelReaderError,
     ExcelWorkbookReader,
@@ -78,7 +81,10 @@ def test_read_valid_workbook_and_preserve_rows(
     result = read_excel(excel_path)
 
     assert result.source_path == excel_path.resolve()
-    assert tuple(result.sheets) == REQUIRED_SHEETS
+    assert tuple(result.sheets) == (
+        *REQUIRED_SHEETS,
+        *OPTIONAL_REFERENCE_SHEETS,
+    )
     assert result.additional_sheet_names == ()
 
     base = result.get_sheet("Base")
@@ -122,6 +128,47 @@ def test_read_valid_workbook_and_preserve_rows(
 
     assert result.total_formulas == 1
     assert result.total_rows == 5
+
+
+def test_two_sheet_workbook_loads_embedded_reference_columns(
+    tmp_path: Path,
+) -> None:
+    excel_path = tmp_path / "entrada_duas_abas.xlsx"
+    create_valid_workbook(excel_path)
+
+    from openpyxl import load_workbook
+
+    workbook = load_workbook(excel_path)
+    del workbook["Sistemas_Origem"]
+    del workbook["Contas_Internas"]
+    base = workbook["Base"]
+    embedded_headers = (
+        "codSistemaOrigem",
+        "nomeSistema",
+        "contaBalAnaliticoDebito",
+        "nomeConta",
+        "contaBalAnaliticoCredito",
+        "nomeConta",
+    )
+    for column, header in enumerate(
+        embedded_headers,
+        start=3,
+    ):
+        base.cell(row=1, column=column, value=header)
+    workbook.save(excel_path)
+    workbook.close()
+
+    result = read_excel(excel_path)
+
+    assert tuple(result.sheets) == REQUIRED_SHEETS
+    assert result.get_sheet("Base").headers[2:] == (
+        "codSistemaOrigem",
+        "nomeSistemaOrigem",
+        "contaBalAnaliticoDebito",
+        "nomeContaBalAnaliticoDebito",
+        "contaBalAnaliticoCredito",
+        "nomeContaBalAnaliticoCredito",
+    )
 
 
 def test_additional_sheets_are_reported_but_not_loaded(

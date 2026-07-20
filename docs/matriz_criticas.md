@@ -74,7 +74,7 @@ Essa tradução é política de controle do projeto e deverá permanecer configu
 
 | Classe | Definição |
 |---|---|
-| `LOCAL` | Pode ser executada apenas com as quatro abas, o XML gerado e os arquivos oficiais fornecidos |
+| `LOCAL` | Pode ser executada apenas com as abas do contrato de entrada, o XML gerado e os arquivos oficiais fornecidos |
 | `PARCIAL` | Parte da regra é local, mas a conclusão exige cadastro ou interpretação externa |
 | `EXTERNA` | Exige UNICAD, base Bacen ou outra base não fornecida |
 | `HISTORICA` | Exige a data-base imediatamente anterior ou histórico equivalente |
@@ -166,7 +166,7 @@ As críticas oficiais não substituem validações técnicas de leitura, normali
 
 | Código interno | Fase | Descrição | Gravidade | Escopo |
 |---|---|---|---|---|
-| `XLSX-EST-001` | Leitura | Uma das quatro abas obrigatórias não existe | FALHA TÉCNICA | Arquivo |
+| `XLSX-EST-001` | Leitura | `Base` ou `Cabecalho` não existe, ou somente uma das abas auxiliares foi fornecida | FALHA TÉCNICA | Arquivo |
 | `XLSX-EST-002` | Leitura | Coluna obrigatória da versão não existe | ERRO IMPEDITIVO | Aba |
 | `XLSX-EST-003` | Leitura | A aba `Cabecalho` possui mais de uma linha de dados | ERRO IMPEDITIVO | Cabeçalho |
 | `XLSX-EST-004` | Leitura | Cabeçalhos duplicados na mesma aba | ERRO IMPEDITIVO | Aba |
@@ -177,8 +177,8 @@ As críticas oficiais não substituem validações técnicas de leitura, normali
 | `NORM-ID-001` | Normalização | Identificador não pode ser convertido sem perda de informação | ERRO IMPEDITIVO | Célula |
 | `MAP-EVT-001` | Agrupamento | Linhas do mesmo `idEvento` têm valores conflitantes | ERRO IMPEDITIVO | Evento |
 | `MAP-PROB-001` | Agrupamento | Mesma probabilidade repetida com valores de risco conflitantes | ERRO IMPEDITIVO | Evento |
-| `MAP-SIS-001` | Referência | Sistema usado na `Base` não existe em `Sistemas_Origem` | ERRO IMPEDITIVO | Evento |
-| `MAP-CONTA-001` | Referência | Conta usada na `Base` não existe em `Contas_Internas` | ERRO IMPEDITIVO | Contabilização |
+| `MAP-SIS-001` | Referência | Sistema usado na `Base` não possui referência única e válida | ERRO IMPEDITIVO | Evento |
+| `MAP-CONTA-001` | Referência | Conta usada na `Base` não possui referência única e válida | ERRO IMPEDITIVO | Contabilização |
 | `CONS-CALC-001` | Consolidação interna | Valores, datas ou categorias não resolvidos | ERRO IMPEDITIVO | Evento/documento |
 | `VER-DATA-001` | Versionamento | `dataBase` anterior a `2020-12` | ERRO IMPEDITIVO | Documento |
 | `VER-DATA-002` | Versionamento | Mês diferente de `06` ou `12` | ERRO IMPEDITIVO | Documento |

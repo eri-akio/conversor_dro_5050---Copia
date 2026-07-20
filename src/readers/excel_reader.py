@@ -3,8 +3,8 @@
 Responsabilidades desta etapa:
 
 - localizar e abrir um arquivo ``.xlsx``;
-- verificar a presença das quatro abas obrigatórias;
-- ler as quatro abas produtivas e fontes opcionais reconhecidas;
+- verificar a presença das abas obrigatórias;
+- ler as abas produtivas e fontes auxiliares reconhecidas;
 - ignorar outras abas adicionais sem tratá-las como erro;
 - preservar o número original das linhas;
 - preservar valores, fórmulas e metadados básicos das células;
@@ -28,7 +28,14 @@ from openpyxl.utils import get_column_letter
 from openpyxl.utils.exceptions import InvalidFileException
 from openpyxl.worksheet.worksheet import Worksheet
 
-from src.config import REQUIRED_SHEETS
+from src.config import (
+    BASE_CREDIT_ACCOUNT_NAME_COLUMN,
+    BASE_DEBIT_ACCOUNT_NAME_COLUMN,
+    BASE_SOURCE_SYSTEM_NAME_COLUMN,
+    OPTIONAL_REFERENCE_SHEETS,
+    REQUIRED_SHEETS,
+    SHEET_BASE,
+)
 
 
 class ExcelReaderError(Exception):
@@ -158,13 +165,13 @@ class ExcelReadResult:
 
     @property
     def total_rows(self) -> int:
-        """Total de linhas de dados nas quatro abas."""
+        """Total de linhas de dados nas abas carregadas."""
 
         return sum(sheet.row_count for sheet in self.sheets.values())
 
     @property
     def total_formulas(self) -> int:
-        """Total de fórmulas encontradas nas quatro abas."""
+        """Total de fórmulas encontradas nas abas carregadas."""
 
         return sum(sheet.formula_count for sheet in self.sheets.values())
 
@@ -175,11 +182,13 @@ class ExcelWorkbookReader:
     def __init__(
         self,
         required_sheets: tuple[str, ...] = REQUIRED_SHEETS,
+        optional_sheets: tuple[str, ...] = OPTIONAL_REFERENCE_SHEETS,
     ) -> None:
         self.required_sheets = required_sheets
+        self.optional_sheets = optional_sheets
 
     def read(self, excel_path: str | Path) -> ExcelReadResult:
-        """Abre o Excel e devolve as quatro abas como dados brutos."""
+        """Abre o Excel e devolve as abas reconhecidas como dados brutos."""
 
         source_path = self._validate_source_path(excel_path)
         workbook = None
@@ -204,7 +213,14 @@ class ExcelWorkbookReader:
                 source_path,
             )
 
-            loaded_sheet_names = self.required_sheets
+            loaded_sheet_names = tuple(dict.fromkeys((
+                *self.required_sheets,
+                *(
+                    sheet_name
+                    for sheet_name in self.optional_sheets
+                    if sheet_name in workbook.sheetnames
+                ),
+            )))
             sheets = {
                 sheet_name: self._read_worksheet(
                     workbook[sheet_name],
@@ -306,13 +322,28 @@ class ExcelWorkbookReader:
         workbook_sheet_names: list[str],
         source_path: Path,
     ) -> None:
-        """Confirma a presença exata das quatro abas obrigatórias."""
+        """Confirma as abas principais e evita fonte auxiliar parcial."""
 
-        missing = tuple(
+        missing = list(
             sheet_name
             for sheet_name in self.required_sheets
             if sheet_name not in workbook_sheet_names
         )
+
+        optional_present = tuple(
+            sheet_name
+            for sheet_name in self.optional_sheets
+            if sheet_name in workbook_sheet_names
+        )
+        if optional_present and (
+            len(optional_present) != len(self.optional_sheets)
+        ):
+            missing.extend(
+                sheet_name
+                for sheet_name in self.optional_sheets
+                if sheet_name not in workbook_sheet_names
+                and sheet_name not in missing
+            )
 
         if missing:
             raise ExcelReaderError(
@@ -320,7 +351,7 @@ class ExcelWorkbookReader:
                 "Uma ou mais abas obrigatórias não foram encontradas.",
                 details={
                     "arquivo": str(source_path),
-                    "abas_ausentes": missing,
+                    "abas_ausentes": tuple(missing),
                     "abas_encontradas": tuple(workbook_sheet_names),
                 },
             )
@@ -483,6 +514,14 @@ class ExcelWorkbookReader:
 
             headers.append(header)
 
+        if worksheet.title == SHEET_BASE:
+            headers = list(
+                ExcelWorkbookReader
+                ._canonicalize_embedded_reference_headers(
+                    tuple(headers)
+                )
+            )
+
         normalized_headers = [
             header.casefold()
             for header in headers
@@ -509,6 +548,47 @@ class ExcelWorkbookReader:
             )
 
         return tuple(headers)
+
+    @staticmethod
+    def _canonicalize_embedded_reference_headers(
+        headers: tuple[str, ...],
+    ) -> tuple[str, ...]:
+        """Resolve aliases posicionais seguros do leiaute de duas abas.
+
+        A planilha operacional original usa ``nomeConta`` duas vezes. O
+        significado só é inequívoco quando cada ocorrência aparece logo
+        depois da respectiva conta interna de débito ou de crédito.
+        """
+
+        canonical: list[str] = []
+        for index, header in enumerate(headers):
+            previous = headers[index - 1] if index else None
+
+            if (
+                header == "nomeSistema"
+                and previous == "codSistemaOrigem"
+            ):
+                canonical.append(
+                    BASE_SOURCE_SYSTEM_NAME_COLUMN
+                )
+            elif (
+                header == "nomeConta"
+                and previous == "contaBalAnaliticoDebito"
+            ):
+                canonical.append(
+                    BASE_DEBIT_ACCOUNT_NAME_COLUMN
+                )
+            elif (
+                header == "nomeConta"
+                and previous == "contaBalAnaliticoCredito"
+            ):
+                canonical.append(
+                    BASE_CREDIT_ACCOUNT_NAME_COLUMN
+                )
+            else:
+                canonical.append(header)
+
+        return tuple(canonical)
 
     @staticmethod
     def _is_completely_empty(

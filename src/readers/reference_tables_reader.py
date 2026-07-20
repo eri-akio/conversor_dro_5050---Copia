@@ -6,10 +6,14 @@ from collections import defaultdict
 from typing import Callable
 
 from src.config import (
+    BASE_CREDIT_ACCOUNT_NAME_COLUMN,
+    BASE_DEBIT_ACCOUNT_NAME_COLUMN,
+    BASE_SOURCE_SYSTEM_NAME_COLUMN,
     INTERNAL_ACCOUNT_CODE_COLUMN,
     INTERNAL_ACCOUNT_NAME_COLUMN,
     REQUIRED_INTERNAL_ACCOUNT_COLUMNS,
     REQUIRED_SOURCE_SYSTEM_COLUMNS,
+    SHEET_BASE,
     SHEET_INTERNAL_ACCOUNTS,
     SHEET_SOURCE_SYSTEMS,
     SOURCE_SYSTEM_CODE_COLUMN,
@@ -50,9 +54,23 @@ SEVERITY_NOT_EXECUTED = "REGRA NÃO EXECUTADA"
 
 
 class ReferenceTablesReader:
-    """Lê as abas ``Sistemas_Origem`` e ``Contas_Internas``."""
+    """Lê referências em abas próprias ou embutidas na ``Base``."""
 
     def read(
+        self,
+        excel_result: ExcelReadResult,
+    ) -> ReferenceTablesReadResult:
+        if (
+            SHEET_SOURCE_SYSTEMS not in excel_result.sheets
+            and SHEET_INTERNAL_ACCOUNTS not in excel_result.sheets
+        ):
+            return self._read_embedded(
+                excel_result.get_sheet(SHEET_BASE)
+            )
+
+        return self._read_separate_sheets(excel_result)
+
+    def _read_separate_sheets(
         self,
         excel_result: ExcelReadResult,
     ) -> ReferenceTablesReadResult:
@@ -86,6 +104,247 @@ class ReferenceTablesReader:
         return ReferenceTablesReadResult(
             systems=systems,
             accounts=accounts,
+        )
+
+    def _read_embedded(
+        self,
+        sheet: RawSheet,
+    ) -> ReferenceTablesReadResult:
+        systems = self._read_embedded_table(
+            sheet=sheet,
+            kind=ReferenceTableKind.SOURCE_SYSTEM,
+            field_pairs=((
+                "codSistemaOrigem",
+                BASE_SOURCE_SYSTEM_NAME_COLUMN,
+            ),),
+            code_normalizer=normalize_source_system_code,
+            uniqueness_code="DRO001102",
+            empty_code="TBL-SIS-EST-002",
+            missing_column_code="TBL-SIS-EST-001",
+            code_field_rule="TBL-SIS-COD-001",
+            name_field_rule="TBL-SIS-NOME-001",
+            skip_empty_pairs=False,
+        )
+        accounts = self._read_embedded_table(
+            sheet=sheet,
+            kind=ReferenceTableKind.INTERNAL_ACCOUNT,
+            field_pairs=(
+                (
+                    "contaBalAnaliticoDebito",
+                    BASE_DEBIT_ACCOUNT_NAME_COLUMN,
+                ),
+                (
+                    "contaBalAnaliticoCredito",
+                    BASE_CREDIT_ACCOUNT_NAME_COLUMN,
+                ),
+            ),
+            code_normalizer=normalize_internal_account_code,
+            uniqueness_code="DRO001101",
+            empty_code="TBL-CONTA-EST-002",
+            missing_column_code="TBL-CONTA-EST-001",
+            code_field_rule="TBL-CONTA-COD-001",
+            name_field_rule="TBL-CONTA-NOME-001",
+            skip_empty_pairs=True,
+        )
+        return ReferenceTablesReadResult(
+            systems=systems,
+            accounts=accounts,
+        )
+
+    def _read_embedded_table(
+        self,
+        *,
+        sheet: RawSheet,
+        kind: ReferenceTableKind,
+        field_pairs: tuple[tuple[str, str], ...],
+        code_normalizer: Callable[
+            [object],
+            NormalizationResult[str],
+        ],
+        uniqueness_code: str,
+        empty_code: str,
+        missing_column_code: str,
+        code_field_rule: str,
+        name_field_rule: str,
+        skip_empty_pairs: bool,
+    ) -> ReferenceTableData:
+        required_columns = tuple(
+            column
+            for pair in field_pairs
+            for column in pair
+        )
+        missing_columns = tuple(
+            column
+            for column in required_columns
+            if column not in sheet.headers
+        )
+        results: list[ReferenceTableRuleResult] = []
+
+        for column in missing_columns:
+            results.append(
+                self._failed(
+                    code=missing_column_code,
+                    description=(
+                        "Exigir as colunas das referências embutidas."
+                    ),
+                    source="Contrato da aba Base",
+                    severity=SEVERITY_BLOCKING_ERROR,
+                    sheet_name=sheet.name,
+                    row_numbers=(1,),
+                    columns=(column,),
+                    message=(
+                        f"A coluna obrigatória {column!r} não foi "
+                        "encontrada na aba Base."
+                    ),
+                    suggestion=(
+                        f"Criar a coluna {column!r} com o nome exato."
+                    ),
+                )
+            )
+
+        records: list[ReferenceTableRecord] = []
+        record_keys: set[tuple[object, ...]] = set()
+
+        for row in sheet.rows:
+            for code_column, name_column in field_pairs:
+                code_result = self._normalize_cell(
+                    cell=self._cell_or_none(
+                        row.cells,
+                        code_column,
+                    ),
+                    missing_column=(
+                        code_column in missing_columns
+                    ),
+                    normalizer=code_normalizer,
+                    field_label=code_column,
+                )
+                name_result = self._normalize_cell(
+                    cell=self._cell_or_none(
+                        row.cells,
+                        name_column,
+                    ),
+                    missing_column=(
+                        name_column in missing_columns
+                    ),
+                    normalizer=lambda value, column=name_column: (
+                        normalize_reference_name(
+                            value,
+                            field_label=column,
+                        )
+                    ),
+                    field_label=name_column,
+                )
+
+                if (
+                    skip_empty_pairs
+                    and code_result.is_absent
+                    and name_result.is_absent
+                ):
+                    continue
+
+                record_key: tuple[object, ...] = (
+                    code_result.status,
+                    code_result.serialized_value,
+                    name_result.status,
+                    name_result.serialized_value,
+                )
+                if not (
+                    code_result.is_valid
+                    and name_result.is_valid
+                ):
+                    record_key += (
+                        repr(code_result.original_value),
+                        repr(name_result.original_value),
+                    )
+                if record_key in record_keys:
+                    continue
+                record_keys.add(record_key)
+
+                record = ReferenceTableRecord(
+                    kind=kind,
+                    sheet_name=sheet.name,
+                    row_number=row.row_number,
+                    code_column=code_column,
+                    name_column=name_column,
+                    code_result=code_result,
+                    name_result=name_result,
+                )
+                records.append(record)
+
+                if not code_result.is_valid:
+                    results.append(
+                        self._field_failure(
+                            code=code_field_rule,
+                            sheet_name=sheet.name,
+                            row_number=row.row_number,
+                            column=code_column,
+                            result=code_result,
+                        )
+                    )
+                if not name_result.is_valid:
+                    results.append(
+                        self._field_failure(
+                            code=name_field_rule,
+                            sheet_name=sheet.name,
+                            row_number=row.row_number,
+                            column=name_column,
+                            result=name_result,
+                        )
+                    )
+
+        if not records:
+            results.append(
+                self._failed(
+                    code=empty_code,
+                    description=(
+                        "Exigir ao menos uma referência utilizada."
+                    ),
+                    source="XSD",
+                    severity=SEVERITY_BLOCKING_ERROR,
+                    sheet_name=sheet.name,
+                    row_numbers=(),
+                    columns=required_columns,
+                    message=(
+                        "A aba Base não contém referências válidas "
+                        f"de {kind.value.lower()}."
+                    ),
+                )
+            )
+
+        conceptual_code_column = (
+            SOURCE_SYSTEM_CODE_COLUMN
+            if kind == ReferenceTableKind.SOURCE_SYSTEM
+            else INTERNAL_ACCOUNT_CODE_COLUMN
+        )
+        conceptual_name_column = (
+            SOURCE_SYSTEM_NAME_COLUMN
+            if kind == ReferenceTableKind.SOURCE_SYSTEM
+            else INTERNAL_ACCOUNT_NAME_COLUMN
+        )
+        results.append(
+            self._validate_uniqueness(
+                kind=kind,
+                sheet_name=sheet.name,
+                records=tuple(records),
+                code_column=conceptual_code_column,
+                uniqueness_code=uniqueness_code,
+                columns=tuple(
+                    code_column
+                    for code_column, _ in field_pairs
+                ),
+            )
+        )
+
+        return ReferenceTableData(
+            kind=kind,
+            sheet_name=sheet.name,
+            code_column=conceptual_code_column,
+            name_column=conceptual_name_column,
+            actual_columns=required_columns,
+            missing_columns=missing_columns,
+            extra_columns=(),
+            records=tuple(records),
+            rule_results=tuple(results),
         )
 
     def _read_table(
@@ -307,10 +566,12 @@ class ReferenceTablesReader:
         records: tuple[ReferenceTableRecord, ...],
         code_column: str,
         uniqueness_code: str,
+        columns: tuple[str, ...] | None = None,
     ) -> ReferenceTableRuleResult:
         description = (
             "Verificar a unicidade dos códigos da tabela auxiliar."
         )
+        result_columns = columns or (code_column,)
         valid_codes: dict[str, list[ReferenceTableRecord]] = defaultdict(list)
         invalid_code_rows: list[int] = []
 
@@ -341,7 +602,7 @@ class ReferenceTablesReader:
                 severity=SEVERITY_ERROR,
                 sheet_name=sheet_name,
                 row_numbers=duplicate_rows,
-                columns=(code_column,),
+                columns=result_columns,
                 message=(
                     "Foram encontrados códigos repetidos. A aplicação não "
                     "escolherá um registro arbitrariamente."
@@ -362,7 +623,7 @@ class ReferenceTablesReader:
                 status=RuleExecutionStatus.NOT_EXECUTED,
                 sheet_name=sheet_name,
                 row_numbers=tuple(invalid_code_rows),
-                columns=(code_column,),
+                columns=result_columns,
                 message=(
                     "A unicidade não pôde ser concluída porque há códigos "
                     "inválidos, ausentes ou nenhum registro."
@@ -377,7 +638,7 @@ class ReferenceTablesReader:
             status=RuleExecutionStatus.PASSED,
             sheet_name=sheet_name,
             row_numbers=tuple(record.row_number for record in records),
-            columns=(code_column,),
+            columns=result_columns,
             message=(
                 f"Os {len(valid_codes)} códigos de {kind.value.lower()} "
                 "são únicos."

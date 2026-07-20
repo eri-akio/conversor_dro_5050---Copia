@@ -76,7 +76,8 @@ probabilidade
 
 ### Contas internas
 
-A aba `Contas_Internas` resulta no bloco XML:
+As referências de contas, vindas da `Base` ou da aba legada
+`Contas_Internas`, resultam no bloco XML:
 
 ```text
 contasSubtitulosInternos
@@ -87,8 +88,9 @@ contasSubtitulosInternos
 O documento final inclui somente sistemas e contas efetivamente
 utilizados pelos eventos e contabilizações.
 
-Registros não utilizados permanecem registrados como informação na
-etapa 5.7, mas não são enviados ao XML.
+No formato legado, registros não utilizados permanecem registrados como
+informação na etapa 5.7, mas não são enviados ao XML. No formato embutido,
+as referências são extraídas somente das linhas efetivamente presentes.
 
 A ordem de primeira utilização é preservada.
 

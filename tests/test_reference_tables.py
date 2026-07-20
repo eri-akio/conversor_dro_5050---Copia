@@ -6,6 +6,11 @@ from pathlib import Path
 
 from openpyxl import load_workbook
 
+from src.config import (
+    BASE_CREDIT_ACCOUNT_NAME_COLUMN,
+    BASE_DEBIT_ACCOUNT_NAME_COLUMN,
+    BASE_SOURCE_SYSTEM_NAME_COLUMN,
+)
 from src.domain.base_row_validation import RuleExecutionStatus
 from src.mappers import group_base_rows
 from src.readers import (
@@ -74,6 +79,94 @@ def prepare_workbook(
     )
     for values in account_rows:
         account_sheet.append(list(values))
+
+    workbook.save(destination)
+    workbook.close()
+
+
+def prepare_embedded_workbook(
+    destination: Path,
+    *,
+    base_rows: list[dict[str, object]] | None = None,
+    legacy_name_headers: bool = False,
+) -> None:
+    rows = base_rows or [base_values()]
+    prepared_rows: list[dict[str, object]] = []
+    for values in rows:
+        prepared = dict(values)
+        prepared.setdefault(
+            BASE_SOURCE_SYSTEM_NAME_COLUMN,
+            "Sistema Origem",
+        )
+        prepared.setdefault(
+            BASE_DEBIT_ACCOUNT_NAME_COLUMN,
+            "Conta Debito",
+        )
+        prepared.setdefault(
+            BASE_CREDIT_ACCOUNT_NAME_COLUMN,
+            "Conta Credito",
+        )
+        prepared_rows.append(prepared)
+
+    create_workbook(destination, prepared_rows)
+    workbook = load_workbook(destination)
+    del workbook["Sistemas_Origem"]
+    del workbook["Contas_Internas"]
+
+    if legacy_name_headers:
+        base = workbook["Base"]
+        original_headers = tuple(
+            cell.value for cell in base[1]
+        )
+        original_rows = tuple(
+            dict(zip(
+                original_headers,
+                (cell.value for cell in row),
+                strict=True,
+            ))
+            for row in base.iter_rows(
+                min_row=2,
+                max_row=base.max_row,
+            )
+        )
+        ordered_headers: list[str] = []
+        for header in original_headers:
+            if header in {
+                BASE_SOURCE_SYSTEM_NAME_COLUMN,
+                BASE_DEBIT_ACCOUNT_NAME_COLUMN,
+                BASE_CREDIT_ACCOUNT_NAME_COLUMN,
+            }:
+                continue
+            ordered_headers.append(header)
+            if header == "codSistemaOrigem":
+                ordered_headers.append(
+                    BASE_SOURCE_SYSTEM_NAME_COLUMN
+                )
+            elif header == "contaBalAnaliticoDebito":
+                ordered_headers.append(
+                    BASE_DEBIT_ACCOUNT_NAME_COLUMN
+                )
+            elif header == "contaBalAnaliticoCredito":
+                ordered_headers.append(
+                    BASE_CREDIT_ACCOUNT_NAME_COLUMN
+                )
+
+        workbook.remove(base)
+        base = workbook.create_sheet("Base", 0)
+        aliases = {
+            BASE_SOURCE_SYSTEM_NAME_COLUMN: "nomeSistema",
+            BASE_DEBIT_ACCOUNT_NAME_COLUMN: "nomeConta",
+            BASE_CREDIT_ACCOUNT_NAME_COLUMN: "nomeConta",
+        }
+        base.append([
+            aliases.get(header, header)
+            for header in ordered_headers
+        ])
+        for values in original_rows:
+            base.append([
+                values.get(header)
+                for header in ordered_headers
+            ])
 
     workbook.save(destination)
     workbook.close()
@@ -148,6 +241,68 @@ def test_valid_tables_and_references_pass(
         validation,
         "DRO001402",
     )[0].status == RuleExecutionStatus.PASSED
+
+
+def test_embedded_references_are_deduplicated_and_validated(
+    tmp_path: Path,
+) -> None:
+    path = tmp_path / "embedded.xlsx"
+    first = base_values()
+    second = dict(first)
+    second["idEvento"] = "EVT0002"
+    second["codigoEventoOrigem"] = "ORIG0002"
+    prepare_embedded_workbook(
+        path,
+        base_rows=[first, second],
+    )
+
+    read_result, validation = process_reference_tables(path)
+
+    assert read_result.systems.sheet_name == "Base"
+    assert read_result.accounts.sheet_name == "Base"
+    assert read_result.systems.row_count == 1
+    assert read_result.accounts.row_count == 2
+    assert validation.is_valid
+    assert validation.is_fully_verified
+
+
+def test_embedded_legacy_name_headers_are_canonicalized(
+    tmp_path: Path,
+) -> None:
+    path = tmp_path / "embedded_aliases.xlsx"
+    prepare_embedded_workbook(
+        path,
+        legacy_name_headers=True,
+    )
+
+    read_result, validation = process_reference_tables(path)
+
+    assert read_result.systems.row_count == 1
+    assert read_result.accounts.row_count == 2
+    assert validation.is_valid
+
+
+def test_embedded_system_code_with_different_names_fails(
+    tmp_path: Path,
+) -> None:
+    path = tmp_path / "embedded_conflict.xlsx"
+    first = base_values()
+    second = dict(first)
+    second["idEvento"] = "EVT0002"
+    second["codigoEventoOrigem"] = "ORIG0002"
+    first[BASE_SOURCE_SYSTEM_NAME_COLUMN] = "Sistema Um"
+    second[BASE_SOURCE_SYSTEM_NAME_COLUMN] = "Sistema Dois"
+    prepare_embedded_workbook(
+        path,
+        base_rows=[first, second],
+    )
+
+    _, validation = process_reference_tables(path)
+    rule = find_rule(validation, "DRO001102")[0]
+
+    assert rule.status == RuleExecutionStatus.FAILED
+    assert rule.row_numbers == (2, 3)
+    assert not validation.is_valid
 
 
 def test_missing_required_column_blocks_table(
