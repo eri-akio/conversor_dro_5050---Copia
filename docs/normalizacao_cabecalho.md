@@ -136,11 +136,13 @@ C + 7 dígitos
 Exemplo:
 
 ```text
-C0099999
+C0099999    → C0099999
+c0099999    → C0099999
+ c0099999   → C0099999
 ```
 
-O sistema remove apenas espaços externos. Ele não transforma `c` em
-`C`, não inventa prefixo e não completa dígitos.
+O sistema remove espaços externos e converte o código para maiúsculas.
+Ele não inventa o prefixo `C` nem completa dígitos ausentes.
 
 A existência do código no UNICAD será uma regra externa e permanece
 não executada sem a base correspondente.
@@ -152,12 +154,16 @@ O Documento 5050 utiliza a raiz de 8 dígitos.
 Exemplos:
 
 ```text
-12.345.678  → 12345678
-12345678    → 12345678
+12.345.678           → 12345678
+12345678             → 12345678
+39.151.658/0001-30   → 39151658
+39151658000130       → 39151658
 ```
 
-Um CNPJ completo de 14 dígitos não é reduzido automaticamente para
-oito dígitos, pois isso alteraria o dado informado sem regra explícita.
+Depois de remover `.`, `/` e `-`, o sistema aceita uma raiz com 8
+dígitos ou um CNPJ completo com 14 dígitos. No segundo caso, extrai os
+8 primeiros dígitos, correspondentes à raiz usada pelo Documento 5050.
+Outras quantidades de dígitos permanecem inválidas.
 
 ### `tipoRemessa`
 

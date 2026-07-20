@@ -6,7 +6,8 @@ Regras implementadas:
 - ``dataBase`` deve resultar em ``AAAA-06`` ou ``AAAA-12``;
 - ``dataBase`` não pode ser anterior a ``2020-12``;
 - ``codigoConglomerado`` deve seguir ``C`` + 7 dígitos;
-- ``cnpj`` deve conter a raiz de 8 dígitos;
+- ``cnpj`` aceita a raiz de 8 dígitos ou o CNPJ completo de 14
+  dígitos, do qual extrai a raiz;
 - ``tipoRemessa`` deve ser ``I`` ou ``S``;
 - ``opcaoPorProvisaoAcumulada`` deve ser ``S`` ou ``N``.
 
@@ -45,6 +46,7 @@ SEMESTER_MONTHS = frozenset({6, 12})
 
 _CONGLOMERATE_PATTERN = re.compile(r"^C[0-9]{7}$")
 _CNPJ_PATTERN = re.compile(r"^[0-9]{8}$")
+_FULL_CNPJ_PATTERN = re.compile(r"^[0-9]{14}$")
 _YEAR_MONTH_PATTERN = re.compile(
     r"^(?P<year>[0-9]{4})-(?P<month>[0-9]{2})$"
 )
@@ -434,7 +436,7 @@ class HeaderNormalizer:
     def _normalize_conglomerate_code(
         value: Any,
     ) -> _FieldNormalization:
-        normalized = _scalar_to_text(value)
+        normalized = _scalar_to_text(value).upper()
 
         if not _CONGLOMERATE_PATTERN.fullmatch(
             normalized
@@ -443,7 +445,8 @@ class HeaderNormalizer:
                 normalized_value=normalized,
                 rule_code="NORM-CAB-CONG-001",
                 rule_description=(
-                    "Remoção de espaços externos do código."
+                    "Remoção de espaços externos e conversão "
+                    "do código para maiúsculas."
                 ),
                 issue_code="CAB-CONG-001",
                 issue_message=(
@@ -456,8 +459,8 @@ class HeaderNormalizer:
             normalized_value=normalized,
             rule_code="NORM-CAB-CONG-001",
             rule_description=(
-                "Remoção de espaços externos e validação "
-                "de C seguido de 7 dígitos."
+                "Remoção de espaços externos, conversão para "
+                "maiúsculas e validação de C seguido de 7 dígitos."
             ),
         )
 
@@ -466,14 +469,20 @@ class HeaderNormalizer:
         value: Any,
     ) -> _FieldNormalization:
         text = _scalar_to_text(value)
-        normalized = re.sub(r"[./-]", "", text)
+        digits = re.sub(r"[./-]", "", text)
+        normalized = (
+            digits[:8]
+            if _FULL_CNPJ_PATTERN.fullmatch(digits)
+            else digits
+        )
 
         if not _CNPJ_PATTERN.fullmatch(normalized):
             return _FieldNormalization(
                 normalized_value=normalized,
                 rule_code="NORM-CAB-CNPJ-001",
                 rule_description=(
-                    "Remoção controlada de '.', '/' e '-'."
+                    "Remoção controlada de '.', '/' e '-' e "
+                    "extração da raiz quando aplicável."
                 ),
                 issue_code="CAB-CNPJ-001",
                 issue_message=(
@@ -486,8 +495,8 @@ class HeaderNormalizer:
             normalized_value=normalized,
             rule_code="NORM-CAB-CNPJ-001",
             rule_description=(
-                "Remoção controlada de pontuação e validação "
-                "da raiz de 8 dígitos."
+                "Remoção controlada de pontuação, extração "
+                "da raiz de CNPJ completo e validação dos 8 dígitos."
             ),
         )
 

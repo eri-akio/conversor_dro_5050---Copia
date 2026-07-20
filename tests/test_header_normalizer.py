@@ -249,13 +249,78 @@ def test_cnpj_punctuation_is_removed(
     assert "opcaoPorProvisaoAcumulada" in changed_fields
 
 
+def test_lowercase_conglomerate_code_is_normalized(
+    tmp_path: Path,
+) -> None:
+    excel_path = tmp_path / "conglomerado_minusculo.xlsx"
+    create_workbook(
+        excel_path,
+        [
+            "5050",
+            "2026-06",
+            " c0099999 ",
+            "99999999",
+            "I",
+            "N",
+        ],
+    )
+
+    result = normalize_from_workbook(excel_path)
+
+    assert result.is_valid
+    assert result.header is not None
+    assert result.header.codigo_conglomerado == "C0099999"
+
+    transformation = next(
+        item
+        for item in result.transformations
+        if item.field_name == "codigoConglomerado"
+    )
+    assert transformation.changed
+    assert transformation.normalized_value == "C0099999"
+
+
+@pytest.mark.parametrize(
+    "raw_value",
+    [
+        "39.151.658/0001-30",
+        "39151658000130",
+    ],
+)
+def test_full_cnpj_is_normalized_to_eight_digit_root(
+    tmp_path: Path,
+    raw_value: str,
+) -> None:
+    excel_path = tmp_path / "cnpj_completo.xlsx"
+    create_workbook(
+        excel_path,
+        [
+            "5050",
+            "2026-06",
+            "C0099999",
+            raw_value,
+            "I",
+            "N",
+        ],
+    )
+
+    result = normalize_from_workbook(excel_path)
+
+    assert result.is_valid
+    assert result.header is not None
+    assert result.header.cnpj == "39151658"
+    assert not any(
+        issue.code == "CAB-CNPJ-001"
+        for issue in result.issues
+    )
+
+
 @pytest.mark.parametrize(
     ("field_index", "raw_value", "error_code"),
     [
         (0, "9999", "CAB-DOC-001"),
-        (2, "c0099999", "CAB-CONG-001"),
         (2, "C123", "CAB-CONG-001"),
-        (3, "12.345.678/0001-99", "CAB-CNPJ-001"),
+        (3, "12.345.678/0001-9", "CAB-CNPJ-001"),
         (3, "1234567", "CAB-CNPJ-001"),
         (4, "X", "CAB-REM-001"),
         (5, "T", "CAB-PROV-001"),
